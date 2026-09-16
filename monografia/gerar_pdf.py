@@ -14,8 +14,8 @@ Chromium em modo headless; a numeração das páginas é carimbada depois com
 reportlab + pypdf (o Chromium não sabe numerar no canto superior direito).
 
 Uso:
-    ../venv/bin/python gerar_pdf.py                  # só a introdução
-    ../venv/bin/python gerar_pdf.py --tudo           # pré-textuais + introdução
+    ../venv/bin/python gerar_pdf.py                  # capa + introdução
+    ../venv/bin/python gerar_pdf.py --tudo           # todas as folhas pré-textuais
 """
 
 import io
@@ -51,6 +51,13 @@ CSS = """
  .capa{text-align:center}
  .capa h1,.capa h2{text-align:center;margin:1.6em 0;page-break-after:auto}
  .capa p{text-indent:0}
+ .folha-capa{position:relative;height:700pt;page-break-after:always}
+ .folha-capa div{position:absolute;left:0;right:0;text-align:center;text-indent:0;margin:0}
+ .c-inst{top:0}
+ .c-autores{top:71pt}
+ .c-titulo{top:303pt;font-weight:bold}
+ .c-cidade{top:648pt}
+ .c-ano{top:672pt}
  .pagina{page-break-after:always}
  .pagina:last-child{page-break-after:auto}
 """
@@ -69,7 +76,30 @@ def corpo(caminho):
     return miolo.strip()
 
 
-def numerar(pdf, primeira=1):
+def capa():
+    """Monta a folha de rosto no layout exato do TCC-modelo.
+
+    As posições verticais (instituição a 3 cm do topo, autores logo abaixo,
+    título a 303 pt e cidade/ano no pé) foram medidas no PDF do orientador.
+    O conteúdo vem do 00_pre_textual.md, pra não haver duas fontes da verdade.
+    """
+    fonte = AQUI / "00_pre_textual.md"
+    bloco = fonte.read_text().split("\n---\n")[0]
+    titulos = [l[2:].strip() for l in bloco.split("\n") if l.startswith("# ")]
+    autores = [l[3:].strip() for l in bloco.split("\n") if l.startswith("## ")]
+    rodape = [l[4:].strip() for l in bloco.split("\n") if l.startswith("### ")]
+
+    linhas_autores = "<br>".join(autores)
+    return (f'<div class="folha-capa">'
+            f'<div class="c-inst">{titulos[0]}</div>'
+            f'<div class="c-autores">{linhas_autores}</div>'
+            f'<div class="c-titulo">{titulos[1]}</div>'
+            f'<div class="c-cidade">{rodape[0]}</div>'
+            f'<div class="c-ano">{rodape[1]}</div>'
+            f'</div>')
+
+
+def numerar(pdf, primeira=1, pular=0):
     """Carimba o número no alto à direita, como no TCC-modelo."""
     try:
         from pypdf import PdfReader, PdfWriter
@@ -81,10 +111,13 @@ def numerar(pdf, primeira=1):
     leitor = PdfReader(pdf)
     escritor = PdfWriter()
     for i, pagina in enumerate(leitor.pages):
+        if i < pular:          # capa é contada mas não numerada
+            escritor.add_page(pagina)
+            continue
         buffer = io.BytesIO()
         c = canvas.Canvas(buffer, pagesize=A4)
         c.setFont("Times-Roman", 12)
-        c.drawRightString(A4[0] - MARGEM_DIREITA_PT, NUMERO_BASELINE_PT, str(primeira + i))
+        c.drawRightString(A4[0] - MARGEM_DIREITA_PT, NUMERO_BASELINE_PT, str(primeira + i - pular))
         c.save()
         buffer.seek(0)
         pagina.merge_page(PdfReader(buffer).pages[0])
@@ -104,19 +137,19 @@ def main():
         print("Chromium não encontrado — não dá pra gerar o PDF.")
         sys.exit(1)
 
-    partes = []
+    partes = [] if tudo else [capa()]
     for nome in capitulos:
         arquivo = AQUI / nome
         if not arquivo.exists():
             print(f"Faltando {nome}: rode antes 'python3 gerar_html.py'")
             sys.exit(1)
-        capa = nome.startswith("00_")
+        pre_textual = nome.startswith("00_")
         for pagina in re.split(r"<hr>", corpo(arquivo)):
             if not pagina.strip():
                 continue
             # nas folhas pré-textuais cada bloco é uma página; no texto corrido,
             # só as referências começam em página nova
-            classe = "pagina capa" if capa else "pagina"
+            classe = "pagina capa" if pre_textual else "pagina"
             partes.append(f'<div class="{classe}">{pagina}</div>')
 
     documento = ('<!doctype html>\n<html lang="pt-BR"><head><meta charset="utf-8">'
@@ -132,7 +165,7 @@ def main():
              "--no-pdf-header-footer", f"--print-to-pdf={saida}", fonte.as_uri()],
             check=True, capture_output=True, timeout=180)
 
-    numerar(saida)
+    numerar(saida, pular=1 if not tudo else 4)
     print(f"PDF gerado: {saida}")
     if DESKTOP.is_dir():
         shutil.copy(saida, DESKTOP / saida.name)
