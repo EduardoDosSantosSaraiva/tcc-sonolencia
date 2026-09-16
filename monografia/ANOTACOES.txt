@@ -1,0 +1,222 @@
+===============================================================================
+TCC - DETECCAO DE SONOLENCIA DO MOTORISTA
+Bloco de notas com tudo que foi feito ate aqui
+Atualizado em 16/09/2026
+===============================================================================
+
+1. IDENTIFICACAO
+-------------------------------------------------------------------------------
+Titulo:      Sistema embarcado de deteccao de sonolencia do motorista em tempo
+             real com processamento local em Raspberry Pi 5
+Autores:     Antonio Eduardo dos Santos Saraiva
+             Lucas Baliza Barreto
+Instituicao: Centro Universitario de Brasilia (UniCEUB)
+Curso:       Engenharia da Computacao
+Professor:   Fabio de Oliveira Guimaraes
+             (voce falou "coordenador"; na folha de rosto esta como orientador,
+              igual ao TCC-modelo. Confirmar com ele.)
+Ano:         2026
+
+
+2. O QUE O SISTEMA FAZ
+-------------------------------------------------------------------------------
+Camera filma o rosto do motorista. A cada quadro o MediaPipe Face Landmarker
+estima 478 pontos da face, e desses pontos saem quatro indicadores:
+
+  EAR     abertura dos olhos. Olho fechado por ~1,5 s continuos = alarme cheio.
+  PERCLOS fracao do tempo com olho fechado numa janela de 60 s. Acima de 15%
+          eleva o nivel de alerta.
+  MAR     abertura da boca. Bocejo = 2 s ou mais com abertura de 2,2x a linha
+          de base.
+  Cabeca  inclinacao (pitch) pela matriz de transformacao facial do MediaPipe.
+
+Tudo roda dentro do Raspberry Pi 5. Nada vai para a nuvem.
+
+Tres niveis de aviso, com vozes diferentes:
+  aviso_fadiga.wav   bocejo. NUNCA vira alarme cheio.
+  aviso_atencao.wav  piscadas longas ou cabeca caindo com frequencia.
+  alerta.wav         alarme cheio: voz "Acorde!" + sirene por baixo. Toca ate
+                     o fim mesmo se a pessoa abrir o olho no meio.
+
+
+3. DECISOES DE PROJETO (o que a banca pode perguntar)
+-------------------------------------------------------------------------------
+* Calibra sempre que liga, nunca guarda calibracao de um dia para o outro.
+  Motivo: iluminacao e angulo de montagem da camera mudam, e limiar fixo erra.
+  Tem aviso de 3 s antes da contagem de 5 s comecar a valer.
+
+* Bocejo nunca dispara o alarme cheio, mesmo que a pessoa feche o olho ao
+  bocejar (reflexo comum). Isso ja causou falso positivo real e foi corrigido.
+
+* O alarme toca ate o fim. Se cortasse quando o olho reabre, ele avisaria sem
+  acordar de verdade.
+
+* Inclinacao de cabeca so entra na decisao se a calibracao de pitch rodar. Sem
+  calibracao, fica desativada de proposito: um limiar absoluto erraria conforme
+  o angulo de montagem da camera.
+
+* Modo oculos escuros: compara o brilho da regiao do olho com o do resto do
+  rosto no mesmo quadro (com histerese de 3 s para entrar e 2 s para sair).
+  Detectando lente escura, desativa o EAR e decide por boca e cabeca. O limiar
+  0,70 foi calibrado com dado real: o seu oculos polarizado deu razao 0,60,
+  contra 0,95 a 1,0 sem oculos.
+
+* Seleciona o motorista entre ate 3 rostos: pega o maior, ou seja, o mais perto
+  da camera. Evita confundir com passageiro do banco de tras.
+
+* Diferencial contra ESP32 (vira capitulo da monografia): no Pi 5 da para rodar
+  landmarks de verdade em tempo real. No ESP32 seria preciso espremer uma CNN
+  pequena numa regiao de interesse, classificando so o estado do olho.
+
+
+4. DADOS DA PRF APURADOS POR NOS (usados na introducao)
+-------------------------------------------------------------------------------
+Fonte: microdados abertos da PRF (datatran, "agrupados por ocorrencia"),
+       https://www.gov.br/prf/pt-br/acesso-a-informacao/dados-abertos
+Script: tcc_sonolencia/monografia/dados_prf/analise_prf.py
+Saida:  tcc_sonolencia/monografia/dados_prf/resultados.txt
+
+Ano    Acidentes   Por sono    %      Mortos (sono)   Posicao no ranking
+2020      63.585      2.110   3,32%            251            7
+2021      64.567      2.311   3,58%            227            9
+2022      64.606      2.165   3,35%            206            9
+2023      67.766      2.094   3,09%            199           10
+2024      73.156      2.136   2,92%            220           10
+2025      72.529      2.116   2,92%            171           10
+
+TOTAL 2020-2025: 406.209 acidentes, 12.932 por sono (3,18%), 1.274 mortes.
+
+Dois achados que usamos como argumento:
+  Letalidade:  9,9 mortos por 100 acidentes por sono, contra 8,4 na media geral.
+  Madrugada:   40,5% dos acidentes por sono acontecem entre 0h e 6h, faixa que
+               responde por so 12,6% do total. Concentracao de 3,2 vezes.
+
+Contraponto citado no texto: a ABRAMET estima que ~42% dos acidentes em rodovias
+federais estariam ligados a sonolencia. A diferenca entre 3,18% registrado e 42%
+estimado e o proprio argumento: nao existe "bafometro do sono", entao o registro
+oficial e piso, nao medida.
+
+
+5. REFERENCIAS DA INTRODUCAO (16, todas conferidas uma a uma)
+-------------------------------------------------------------------------------
+ 1. OMS. Global status report on road safety 2023.
+ 2. NARCISO & MELLO. Rev. Saude Publica, v. 51, 2017.
+ 3. PRF. Dados abertos (datatran) 2020-2025. Apuracao propria.
+ 4. ABRAMET. Levantamento sobre saude de motoristas.
+ 5. DAWSON & REID. Nature, v. 388, 1997. (17-24 h acordado = 0,05-0,10% de
+    alcool no sangue)
+ 6. BRASIL. Lei 13.103/2015 (Lei do Motorista).
+ 7. UE. Regulamento 2019/2144 (obriga DDAW).
+ 8. UE. Regulamento Delegado 2021/1341 (requisitos tecnicos do DDAW).
+ 9. DINGES & GRACE. PERCLOS, FHWA, 1998.
+10. SOUKUPOVA & CECH. Eye Aspect Ratio, CVWW 2016.
+11. KARTYNNIK et al. Face Mesh do MediaPipe, arXiv 2019.
+12. ESSAHRAUI et al. Sensors, v. 25, art. 812, 2025.
+13. MOREDO, CELINO & IBARRA. Raspberry Pi 4 + LSTM, Eng. Proceedings, 2025.
+14. ALAJLAN & IBRAHIM. DDD TinyML, Sensors, v. 23, art. 5696, 2023.
+15. BRASIL. Lei 13.709/2018 (LGPD).
+16. GOOGLE. MediaPipe Face Landmarker (documentacao).
+
+
+6. TEMPLATE DO TCC (medido no PDF que o orientador mandou)
+-------------------------------------------------------------------------------
+Papel A4, margens 3 cm no topo e a esquerda, 2 cm a direita e embaixo.
+Times New Roman 12 pt, justificado, entrelinha 1,15.
+Recuo de primeira linha 1,22 cm, 10 pt entre paragrafos.
+Titulos em Times 12 negrito, caixa alta, a esquerda.
+Numero de pagina no alto a direita. A capa conta mas nao e numerada.
+Citacoes em numero sobrescrito, referencias numeradas em ABNT com DOI.
+Sem travessao no texto (o modelo praticamente nao usa; o nosso tambem nao usa).
+
+
+7. ONDE ESTA CADA COISA
+-------------------------------------------------------------------------------
+Projeto:  /home/eduardo/tcc_sonolencia/   (repositorio git, 4 commits)
+  core.py                 metricas, maquina de estados, camera, banco
+  eye_fatigue.py          aplicacao principal, alarmes, modo autoteste
+  test_core.py            16 testes automatizados (pytest), todos passando
+  protocolo_testes.md     roteiro dos 8 cenarios de validacao
+  benchmark.py            mede latencia e FPS (AINDA NAO RODADO)
+  focus_check.py          ajuda a focar a lente
+  resumo_sessao.py        resume uma sessao gravada no banco
+  autoteste_resultados/   relatorios do autoteste guiado
+  alarme_snapshots/       fotos do alarme (fora do git: dado biometrico)
+
+Monografia: /home/eduardo/tcc_sonolencia/monografia/
+  00_pre_textual.md       capa, folha de rosto, folha de aprovacao, resumo
+  01_introducao.md        introducao + referencias (TEXTO FONTE)
+  gerar_html.py           .md -> .html formatado em ABNT
+  gerar_pdf.py            .html -> PDF no template do orientador
+  dados_prf/              script e resultado da apuracao da PRF
+
+Area de Trabalho:
+  TCC - Introducao.pdf    ARQUIVO PARA ENVIAR (capa + introducao + referencias)
+  TCC - Introducao.html   para colar no Google Docs mantendo formatacao
+  TCC - Introducao.md     texto puro
+  TCC - Anotacoes.txt     este arquivo
+
+
+8. COMANDOS
+-------------------------------------------------------------------------------
+Rodar o sistema:
+  ~/tcc_sonolencia/iniciar.sh
+Autoteste guiado por voz (8 cenarios, serve de demonstracao para a banca):
+  ~/tcc_sonolencia/autoteste.sh
+Testes automatizados:
+  cd ~/tcc_sonolencia && ./venv/bin/python -m pytest
+Medir latencia e FPS (falta fazer):
+  cd ~/tcc_sonolencia && ./venv/bin/python benchmark.py --seconds 30
+Regerar o HTML e o PDF depois de editar o texto:
+  cd ~/tcc_sonolencia/monografia
+  python3 gerar_html.py && ../venv/bin/python gerar_pdf.py
+PDF com capa, folha de rosto e folha de aprovacao juntas:
+  ../venv/bin/python gerar_pdf.py --tudo
+
+
+9. ESTADO DOS TESTES
+-------------------------------------------------------------------------------
+Ultima rodada do autoteste guiado: 09/09/2026, 6 de 8 cenarios passaram.
+  OK:      piscada normal, piscada longa, microssono, fala normal,
+           cabeca caindo, oculos escuros
+  FALHOU:  Baseline (dispara alarme ou piscada longa a toa)
+           Bocejo real (MAR chegou a 0,816 mas nao sustentou o tempo minimo)
+
+Depois dessa rodada foi adicionada telemetria de EAR por cenario para
+diagnosticar o Baseline, mas o autoteste ainda NAO foi rodado de novo.
+
+Em 11/09/2026 o sistema foi executado e a calibracao de olho falhou
+("poucas amostras de olho detectadas"). Provavelmente ligado a camera
+desfocada ou a iluminacao. Ver calibracao_log.txt.
+
+Testes automatizados: 16 de 16 passando.
+
+
+10. PENDENCIAS
+-------------------------------------------------------------------------------
+[ ] Camera OV5647 relatada como desfocada. PRIORIDADE ZERO: nenhum dado de
+    acuracia vale antes de resolver isso. Usar focus_check.py.
+[ ] Rodar o autoteste de novo e olhar a telemetria de EAR do Baseline.
+[ ] Rodar o benchmark.py para ter latencia e FPS do Capitulo 4.
+[ ] Publicar o repositorio no GitHub (gh ja instalado; falta "gh auth login").
+    Depois disso volta no texto a frase sobre repositorio publico.
+[ ] Sem alarme se o Bluetooth cair. Nao ha buzzer fisico de reserva.
+[ ] Camera NoIR + LEDs infravermelhos 850 nm: planejados, nao instalados.
+    Solucao real para oculos escuros e para direcao noturna.
+[ ] Servico systemd criado mas nao ativado. Rodar manualmente:
+    systemctl --user daemon-reload && systemctl --user enable --now tcc-sonolencia
+[ ] Resumo e Abstract: so dao para fechar depois dos resultados.
+[ ] Capitulos 2 a 5 da monografia.
+
+
+11. OBSERVACOES SOBRE O TEXTO ENVIADO AO ORIENTADOR
+-------------------------------------------------------------------------------
+* A frase que citava repositorio publico foi retirada ate o GitHub existir,
+  para nao sair um placeholder no PDF.
+* A validacao esta descrita como "organizada em tres frentes, cujos resultados
+  sao apresentados no Capitulo 4", porque o benchmark ainda nao foi executado.
+  Dizer que ja foi conduzida seria impreciso.
+* A fonte embutida no PDF e Liberation Serif, clone metrico da Times New Roman
+  (o Pi nao tem a fonte original). Visualmente identica. Para ter a Times de
+  verdade: sudo apt install ttf-mscorefonts-installer.
+* Ordem dos autores esta como voce informou. Alguns cursos exigem ordem
+  alfabetica: confirmar com a coordenacao.
