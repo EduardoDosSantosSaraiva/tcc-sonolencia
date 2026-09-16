@@ -86,6 +86,8 @@ def converter(caminho_md):
             fecha_lista()
             fecha_nota()
             continue
+        if linha.strip() == ">" and em_nota:
+            continue  # linha em branco dentro de uma citação: mantém o bloco aberto
         if linha.startswith("> "):
             if not em_nota:
                 linhas.append('<div class="nota">')

@@ -18,3 +18,7 @@ latencias.csv
 # Fotos do rosto do condutor capturadas nos alarmes.
 # Nunca versionar: são dados biométricos (LGPD, art. 5º, II).
 alarme_snapshots/
+
+# Saídas geradas a partir dos .md da monografia (ver gerar_html.py / gerar_pdf.py)
+monografia/*.html
+monografia/*.pdf
