@@ -1,0 +1,14 @@
+# Dependências instaladas no venv do projeto.
+#
+# O venv é criado com --system-site-packages porque a picamera2 e suas
+# dependências (libcamera) vêm do apt do Raspberry Pi OS, não do pip:
+#
+#   sudo apt install -y python3-picamera2 libcamera-apps sox
+#   python3 -m venv --system-site-packages venv
+#   ./venv/bin/pip install -r requirements.txt
+#
+mediapipe==1.0.1
+numpy==2.2.4
+opencv-contrib-python==5.0.0.93
+piper-tts==1.8.0
+pytest==9.1.1
