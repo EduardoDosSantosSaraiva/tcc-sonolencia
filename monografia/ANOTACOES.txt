@@ -97,7 +97,7 @@ estimado e o proprio argumento: nao existe "bafometro do sono", entao o registro
 oficial e piso, nao medida.
 
 
-5. REFERENCIAS DA INTRODUCAO (16, todas conferidas uma a uma)
+5. REFERENCIAS DA INTRODUCAO (15, todas conferidas uma a uma)
 -------------------------------------------------------------------------------
  1. OMS. Global status report on road safety 2023.
  2. NARCISO & MELLO. Rev. Saude Publica, v. 51, 2017.
@@ -111,11 +111,13 @@ oficial e piso, nao medida.
  9. DINGES & GRACE. PERCLOS, FHWA, 1998.
 10. SOUKUPOVA & CECH. Eye Aspect Ratio, CVWW 2016.
 11. KARTYNNIK et al. Face Mesh do MediaPipe, arXiv 2019.
-12. ESSAHRAUI et al. Sensors, v. 25, art. 812, 2025.
-13. MOREDO, CELINO & IBARRA. Raspberry Pi 4 + LSTM, Eng. Proceedings, 2025.
-14. ALAJLAN & IBRAHIM. DDD TinyML, Sensors, v. 23, art. 5696, 2023.
-15. BRASIL. Lei 13.709/2018 (LGPD).
-16. GOOGLE. MediaPipe Face Landmarker (documentacao).
+12. MOREDO, CELINO & IBARRA. Raspberry Pi 4 + LSTM, Eng. Proceedings, 2025.
+13. ALAJLAN & IBRAHIM. DDD TinyML, Sensors, v. 23, art. 5696, 2023.
+14. BRASIL. Lei 13.709/2018 (LGPD).
+15. GOOGLE. MediaPipe Face Landmarker (documentacao).
+
+Fora da introducao, guardada para o Capitulo 2:
+    ESSAHRAUI et al. Sensors, v. 25, art. 812, 2025.
 
 
 6. TEMPLATE DO TCC (medido no PDF que o orientador mandou)
@@ -145,6 +147,7 @@ Projeto:  /home/eduardo/tcc_sonolencia/   (repositorio git, 4 commits)
 Monografia: /home/eduardo/tcc_sonolencia/monografia/
   00_pre_textual.md       capa, folha de rosto, folha de aprovacao, resumo
   01_introducao.md        introducao + referencias (TEXTO FONTE)
+  02_fundamentacao_rascunho.md  material que saiu da introducao, base do Cap. 2
   gerar_html.py           .md -> .html formatado em ABNT
   gerar_pdf.py            .html -> PDF no template do orientador
   dados_prf/              script e resultado da apuracao da PRF
@@ -218,5 +221,15 @@ Testes automatizados: 16 de 16 passando.
 * A fonte embutida no PDF e Liberation Serif, clone metrico da Times New Roman
   (o Pi nao tem a fonte original). Visualmente identica. Para ter a Times de
   verdade: sudo apt install ttf-mscorefonts-installer.
+* A introducao foi enxugada de 1.789 para ~1.100 palavras (de 3 para 2 paginas),
+  para ficar no tamanho do TCC-modelo (691 palavras) e da recomendacao corrente
+  de 1 a 2 paginas. Os cinco elementos padrao continuam la, nessa ordem:
+  contextualizacao, problema (enunciado como pergunta), objetivos geral e
+  especificos, justificativa e organizacao do trabalho.
+* O que saiu da introducao (taxonomia das tres familias de abordagens e a
+  discussao detalhada dos trabalhos relacionados) foi para
+  02_fundamentacao_rascunho.md. Nada foi jogado fora.
+* O texto nao usa travessao, seguindo o TCC-modelo (que tem 1 travessao em 24
+  paginas, contra 39 pares de parenteses).
 * Ordem dos autores esta como voce informou. Alguns cursos exigem ordem
   alfabetica: confirmar com a coordenacao.
