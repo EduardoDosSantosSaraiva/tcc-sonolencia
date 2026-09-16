@@ -28,9 +28,7 @@ Metodologicamente, o trabalho consistiu na construção do sistema em linguagem 
 
 Este trabalho está organizado da seguinte forma: o Capítulo 2 apresenta a fundamentação teórica, abordando os mecanismos fisiológicos da sonolência, as métricas comportamentais empregadas e as tecnologias de visão computacional utilizadas; o Capítulo 3 descreve a metodologia, detalhando a arquitetura do sistema, o processo de calibração, a lógica de classificação e o protocolo de testes; o Capítulo 4 apresenta e discute os resultados obtidos, incluindo o desempenho computacional e o comportamento do sistema nos cenários avaliados, bem como as limitações identificadas; e o Capítulo 5 traz as conclusões e as perspectivas de trabalhos futuros.
 
----
-
-# REFERÊNCIAS CITADAS NESTA SEÇÃO
+# REFERÊNCIAS BIBLIOGRÁFICAS
 
 1. WORLD HEALTH ORGANIZATION. **Global status report on road safety 2023**. Geneva: World Health Organization, 2023. Disponível em: https://www.who.int/publications/i/item/9789240086517. Acesso em: 16 set. 2026.
 

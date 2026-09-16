@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Converte os arquivos .md da monografia em .html formatado em ABNT
-(Times New Roman 12, justificado, entrelinha 1,5, recuo de parágrafo e
+(Times New Roman 12, justificado, entrelinha 1,15, recuo de parágrafo e
 citações em sobrescrito de verdade) e copia o resultado para a Área de
 Trabalho, pronto pra colar no Google Docs preservando a formatação.
 
@@ -21,8 +21,8 @@ AQUI = Path(__file__).parent
 DESKTOP = Path.home() / "Desktop"
 
 # nome amigável usado na cópia da Área de Trabalho
+# só a introdução vai pra Área de Trabalho: é o que o orientador pediu
 APELIDOS = {
-    "00_pre_textual": "TCC - Capa e folha de rosto",
     "01_introducao": "TCC - Introducao",
 }
 
@@ -30,17 +30,17 @@ SUPERSCRITOS = {"⁰": "0", "¹": "1", "²": "2", "³": "3", "⁴": "4",
                 "⁵": "5", "⁶": "6", "⁷": "7", "⁸": "8", "⁹": "9"}
 
 CSS = """
- body{font-family:"Times New Roman",Times,serif;font-size:12pt;line-height:1.5;
-      max-width:17cm;margin:2cm auto;padding:0 1cm;color:#000;text-align:justify}
- h1{font-size:12pt;font-weight:bold;text-align:left;text-transform:uppercase;margin:1.4em 0 .8em}
- h2{font-size:12pt;font-weight:bold;text-align:left;margin:1.2em 0 .6em}
+ body{font-family:"Times New Roman",Times,serif;font-size:12pt;line-height:1.15;
+      max-width:16cm;margin:2cm auto;padding:0 1cm;color:#000;text-align:justify}
+ h1{font-size:12pt;font-weight:bold;text-align:left;text-transform:uppercase;margin:24pt 0 18pt}
+ h2{font-size:12pt;font-weight:bold;text-align:left;margin:18pt 0 10pt}
  h3{font-size:12pt;font-weight:normal;text-align:center;margin:1em 0}
- p{text-indent:1.25cm;margin:0 0 .35em}
- p.ref{text-indent:0;margin:0 0 .8em;text-align:left}
+ p{text-indent:1.22cm;margin:0 0 10pt}
+ p.ref{text-indent:0;margin:0 0 10pt}
  sup{font-size:.7em;vertical-align:super;line-height:0}
  .nota{background:#f4f4f4;border-left:3px solid #999;padding:.6em 1em;margin:0 0 1.5em}
  .nota p{text-indent:0;font-size:11pt}
- ul{margin:0 0 1em 0}li{text-align:justify;margin-bottom:.4em}
+ ul{margin:0 0 10pt 0}li{text-align:justify;margin-bottom:.3em}
  code{font-family:"Courier New",monospace;font-size:11pt}
  hr{border:0;border-top:1px solid #bbb;margin:2.5em 0}
  a{color:#000}
