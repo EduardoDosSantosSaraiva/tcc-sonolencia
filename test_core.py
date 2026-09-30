@@ -464,3 +464,61 @@ def test_head_drop_ratio_ignores_side_camera_angle():
     de_frente = core.head_drop_ratio(rosto(0.0), 640, 640)
     de_lado = core.head_drop_ratio(rosto(math.radians(40)), 640, 640)
     assert de_lado == pytest.approx(de_frente, rel=0.02)
+
+
+# ---------------------------------------------------------------------------
+# Sorriso/riso e PERCLOS com bocejo
+# ---------------------------------------------------------------------------
+
+def test_smile_gives_closed_eyes_the_same_extra_time_as_talking():
+    """Olho fechado rindo não é cochilo: o alarme cheio espera 2.5 s em vez
+    de 1.5 s. Sério (sorriso no neutro), continua 1.5 s."""
+    def alarme_em(smile):
+        state = core.DrowsinessState(ear_threshold=0.21, smile_baseline=0.05)
+        t = 0.0
+        while t < 4.0:
+            st = state.update(0.1, 0.1, 0.02, None, None, True, t, smile=smile)
+            if st["level"] == "fechado":
+                return t
+            t += 0.1
+        return None
+    assert alarme_em(0.05) == pytest.approx(core.CLOSED_SECONDS_ALERT, abs=0.11)
+    assert alarme_em(0.6) == pytest.approx(core.CLOSED_SECONDS_ALERT_TALKING, abs=0.11)
+
+
+def test_smile_rule_is_off_without_calibrated_neutral():
+    """Sem o neutro da calibração não dá pra saber se é sorriso ou o formato
+    da boca da pessoa: a regra fica desligada."""
+    state = core.DrowsinessState(ear_threshold=0.21)
+    state.update(0.1, 0.1, 0.02, None, None, True, 0.0, smile=0.9)
+    st = state.update(0.1, 0.1, 0.02, None, None, True, 2.0, smile=0.9)
+    assert st["level"] == "fechado"
+
+
+def test_long_blink_while_laughing_is_not_counted():
+    state = core.DrowsinessState(ear_threshold=0.21, smoothing_window=1, smile_baseline=0.05)
+    state.update(0.1, 0.1, 0.02, None, None, True, 0.0, smile=0.6)
+    st = state.update(0.3, 0.3, 0.02, None, None, True, 0.9, smile=0.6)
+    assert st["blink_count_recent"] == 0
+
+
+def test_neutral_smile_comes_from_closed_mouth_calibration_frames():
+    repouso = [(i / 10, 0.3, 0.02, 0.4, 0.05, 0.10) for i in range(50)]
+    rindo = [(5 + i / 10, 0.3, 0.02, 0.4, 0.05, 0.70) for i in range(10)]
+    bocejo = [(6 + i / 10, 0.2, 0.9, 0.4, 0.8, 0.90) for i in range(20)]
+    assert core.sorriso_neutro(repouso + bocejo) == pytest.approx(0.10)
+    assert core.sorriso_neutro(repouso + rindo) == pytest.approx(0.10)
+    assert core.sorriso_neutro(repouso[:5]) is None
+    assert core.sorriso_neutro([q[:5] for q in repouso]) is None   # série sem sorriso
+
+
+def test_closed_eyes_while_yawning_do_not_raise_perclos():
+    """Olho fechado no bocejo é fadiga (aviso próprio), não entra no PERCLOS."""
+    state = core.DrowsinessState(ear_threshold=0.21, mar_threshold=0.55)
+    t = 0.0
+    while t < 5.0:
+        st = state.update(0.05, 0.05, 0.8, None, None, True, t); t += 0.1
+    assert st["perclos"] == 0.0
+    while t < 10.0:
+        st = state.update(0.05, 0.05, 0.02, None, None, True, t); t += 0.1
+    assert st["perclos"] > 0.0

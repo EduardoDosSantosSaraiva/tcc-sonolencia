@@ -468,7 +468,7 @@ def run_calibration(source, landmarker, headless, cv2, player=None, conferir=Tru
         wait_for_ready(source, headless, cv2)
         print(f"Calibrando pra valer (tentativa {tentativa}/{tentativas})... olhos abertos e relaxados, "
               f"boca fechada, cabeça reta, por {core.CALIBRATION_SECONDS:.0f}s.")
-        ear_baseline, mar_baseline, pitch_baseline, warning, bocejos = core.calibrate(
+        ear_baseline, mar_baseline, pitch_baseline, warning, bocejos, sorriso_baseline = core.calibrate(
             source, landmarker, on_frame=on_frame)
         if bocejos:
             print(f"{len(bocejos)} bocejo(s) durante a calibração: entram na contagem de bocejos.")
@@ -495,13 +495,13 @@ def run_calibration(source, landmarker, headless, cv2, player=None, conferir=Tru
         print("Usando limiares padrão (sem calibração válida de olho).")
         if conferir:
             speak_blocking(FALA_CALIB_PADRAO, player)
-        return None, None, None, bocejos_total
+        return None, None, None, None, bocejos_total
     print(f"Calibração concluída. EAR olho aberto: {ear_baseline:.3f}"
           + (f"  MAR boca fechada: {mar_baseline:.3f}" if mar_baseline else "  MAR: sem amostras suficientes")
           + (f"  pitch neutro: {pitch_baseline:.3f}" if pitch_baseline is not None else "  pitch: sem amostras suficientes"))
     if conferir:
         speak_blocking(FALA_CALIB_OK, player)
-    return ear_baseline, mar_baseline, pitch_baseline, bocejos_total
+    return ear_baseline, mar_baseline, pitch_baseline, sorriso_baseline, bocejos_total
 
 
 # ---------------------------------------------------------------------------
@@ -641,7 +641,7 @@ def run_guided_self_test(source, landmarker, state, cv2, MpImage, MpImageFormat,
                     st = state.update(
                         pf["left_ear"], pf["right_ear"], pf["mar"], pf["head_pitch"],
                         pf["eyes_dark"], pf["face_detected"], t,
-                        jaw_open=pf["blendshapes"].get("jawOpen"),
+                        jaw_open=pf["blendshapes"].get("jawOpen"), smile=core.sorriso(pf["blendshapes"]),
                     )
                     snapshot = {
                         "blink_count": st["blink_count_recent"],
@@ -790,7 +790,7 @@ def run_live_monitoring(source, landmarker, state, cv2, MpImage, MpImageFormat, 
             st = state.update(
                 pf["left_ear"], pf["right_ear"], pf["mar"], pf["head_pitch"],
                 pf["eyes_dark"], face_detected, t,
-                jaw_open=pf["blendshapes"].get("jawOpen"),
+                jaw_open=pf["blendshapes"].get("jawOpen"), smile=core.sorriso(pf["blendshapes"]),
             )
             perclos_value = st["perclos"]
 
@@ -911,7 +911,7 @@ def run_live_monitoring(source, landmarker, state, cv2, MpImage, MpImageFormat, 
     return frame_count, perclos_value
 
 
-def build_state(ear_baseline, mar_baseline, pitch_baseline):
+def build_state(ear_baseline, mar_baseline, pitch_baseline, smile_baseline=None):
     """Converte a calibração em limiares e monta o estado de decisão.
     Compartilhado com avaliar_yawdd.py, pra avaliação no dataset usar
     exatamente os mesmos limiares do programa ao vivo."""
@@ -931,12 +931,14 @@ def build_state(ear_baseline, mar_baseline, pitch_baseline):
     print(f"Limiares em uso: fechado<{ear_threshold:.3f}  quase-fechado<{ear_almost_closed:.3f}  "
           f"bocejo>{mar_threshold:.3f} (sustenta>{mar_threshold * core.MAR_SUSTAIN_RATIO:.3f})  "
           + (f"cabeca-caida>{head_pitch_threshold:.3f}" if head_pitch_threshold is not None else "cabeca-caida: desativado (sem calibracao)")
+          + (f"  sorriso>{smile_baseline + core.SMILE_DELTA:.3f}" if smile_baseline is not None else "  sorriso: desativado")
           + ("" if ear_baseline else "  (EAR padrão, sem calibração)"))
 
     return core.DrowsinessState(
         ear_threshold=ear_threshold, ear_almost_closed=ear_almost_closed,
         perclos_ear_threshold=ear_baseline * core.PERCLOS_CLOSED_RATIO if ear_baseline else None,
         mar_threshold=mar_threshold, head_pitch_threshold=head_pitch_threshold,
+        smile_baseline=smile_baseline,
     )
 
 
@@ -971,13 +973,13 @@ def main():
 
     bocejos_calib = []
     if args.skip_calibration:
-        ear_baseline = mar_baseline = pitch_baseline = None
+        ear_baseline = mar_baseline = pitch_baseline = smile_baseline = None
     else:
         voz = None if args.no_sound else (shutil.which("pw-play") or shutil.which("paplay") or shutil.which("ffplay"))
-        ear_baseline, mar_baseline, pitch_baseline, bocejos_calib = run_calibration(
+        ear_baseline, mar_baseline, pitch_baseline, smile_baseline, bocejos_calib = run_calibration(
             source, landmarker, headless, cv2, player=voz, conferir=not args.video)
 
-    state = build_state(ear_baseline, mar_baseline, pitch_baseline)
+    state = build_state(ear_baseline, mar_baseline, pitch_baseline, smile_baseline)
     for t_bocejo in bocejos_calib:   # entra na janela de frequência e no log (1º frame)
         state.registrar_bocejo(t_bocejo)
     alert_player = None if args.no_sound else AlertPlayer()

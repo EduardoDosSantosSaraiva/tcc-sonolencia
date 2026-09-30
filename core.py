@@ -119,6 +119,14 @@ TALKING_MIN_OPENINGS = 2      # nº de aberturas na janela pra contar como fala 
 CLOSED_SECONDS_ALERT_TALKING = 2.5  # quem está falando ativamente não está cochilando:
                                # olho fechado numa risada não dispara o alarme cheio
                                # com 1.5 s, espera até aqui. Calado continua 1.5 s
+SMILE_DELTA = 0.25            # sorriso/riso: mouthSmile (média esq/dir) acima do neutro
+                               # da calibração. Sorrir é músculo contraído, o oposto do
+                               # rosto que relaxa no cochilo. Nos 43 vídeos-problema do
+                               # YawDD: piscada normal +0.00 (mediana), alarmes cheios
+                               # falsos +0.20, 5 dos 9 sorrindo. Entre 0.15 e 0.30 o
+                               # resultado é o mesmo (6 alarmes), 0.25 fica no meio
+SMILE_GRACE_SECONDS = 1.0     # o sorriso vale por mais esse tempo depois de sumir: no
+                               # riso o sorriso oscila enquanto o olho segue fechado
 YAWN_WINDOW_SECONDS = 300     # janela deslizante (5min) p/ frequência de bocejos
 YAWN_FREQ_ALERT = 3           # nº de bocejos na janela que já eleva o nível
 
@@ -285,7 +293,22 @@ def mouth_opening_ratio(landmarks, w, h, lips=INNER_LIPS):
 
 
 NOSE_TIP, CHIN = 1, 152
-BLENDSHAPES_USADOS = ("jawOpen", "mouthClose", "eyeBlinkLeft", "eyeBlinkRight")
+BLENDSHAPES_USADOS = ("jawOpen", "mouthClose", "eyeBlinkLeft", "eyeBlinkRight",
+                      # olhar pra baixo: estudado e descartado (a pálpebra fechando
+                      # já sobe o eyeLookDown numa piscada normal, +0.32 contra +0.15
+                      # nos alarmes falsos). cheekSquint: o modelo devolve sempre ~0.
+                      # Ficam gravados nas séries do YawDD pra referência
+                      "eyeLookDownLeft", "eyeLookDownRight", "eyeLookUpLeft", "eyeLookUpRight",
+                      "eyeSquintLeft", "eyeSquintRight",
+                      # sorriso: usado (SMILE_DELTA)
+                      "mouthSmileLeft", "mouthSmileRight",
+                      "cheekSquintLeft", "cheekSquintRight")
+
+
+def sorriso(blendshapes):
+    """Sorriso de 0 a 1 (média de mouthSmileLeft/Right), ou None."""
+    l, r = blendshapes.get("mouthSmileLeft"), blendshapes.get("mouthSmileRight")
+    return (l + r) / 2 if l is not None and r is not None else None
 
 
 def jaw_drop_ratio(landmarks, w, h):
@@ -647,8 +670,8 @@ class VideoFileSource:
 def calibrate(source, landmarker, seconds=CALIBRATION_SECONDS, on_frame=None):
     """on_frame(display_frame, remaining_s) é chamado a cada frame, se dado
     (pra desenhar uma contagem regressiva na tela). Retorna
-    (ear_baseline, mar_baseline, pitch_baseline, warning, bocejos), ver
-    calibrar_quadros(). ear_baseline é
+    (ear_baseline, mar_baseline, pitch_baseline, warning, bocejos,
+    sorriso_baseline), ver calibrar_quadros() e sorriso_neutro(). ear_baseline é
     None se não conseguiu amostras suficientes OU se o valor calibrado caiu
     fora de uma faixa plausível (ver EAR_BASELINE_MIN/MAX) — quem chama deve
     cair pros limiares padrão nesse caso. mar_baseline/pitch_baseline podem
@@ -657,7 +680,7 @@ def calibrate(source, landmarker, seconds=CALIBRATION_SECONDS, on_frame=None):
     descartado por implausibilidade, ou None se não houve problema."""
     import mediapipe as mp
 
-    quadros = []   # (t, ear, mar, pitch, jaw) por frame, None onde não deu pra medir
+    quadros = []   # (t, ear, mar, pitch, jaw, sorriso) por frame, None onde não deu pra medir
     t0 = None
     ts = MonotonicMs()
 
@@ -691,14 +714,14 @@ def calibrate(source, landmarker, seconds=CALIBRATION_SECONDS, on_frame=None):
                     l = eye_aspect_ratio(landmarks, LEFT_EYE, iw, ih)
                     r = eye_aspect_ratio(landmarks, RIGHT_EYE, iw, ih)
                     ear = (l + r) / 2 if l is not None and r is not None else None
+                    bs = blendshapes_do_rosto(result, idx)
                     quadros.append((t, ear, mouth_aspect_ratio(landmarks, MOUTH, iw, ih),
-                                    head_drop_ratio(landmarks, iw, ih),
-                                    blendshapes_do_rosto(result, idx).get("jawOpen")))
+                                    head_drop_ratio(landmarks, iw, ih), bs.get("jawOpen"), sorriso(bs)))
 
         if on_frame:
             on_frame(display_frame, remaining)
 
-    return calibrar_quadros(quadros)
+    return (*calibrar_quadros(quadros), sorriso_neutro(quadros))
 
 
 def _boca_aberta(mar, jaw=None):
@@ -711,7 +734,7 @@ def tempo_em_repouso(quadros):
     """Segundos de calibração com a boca fechada (os frames que valem pra
     calibrar), somando o intervalo até cada frame em repouso."""
     total = 0.0
-    for (t_ant, *_), (t, _e, m, _p, j) in zip(quadros, quadros[1:]):
+    for (t_ant, *_), (t, _e, m, _p, j, *_) in zip(quadros, quadros[1:]):
         if not _boca_aberta(m, j):
             total += t - t_ant
     return total
@@ -731,7 +754,7 @@ def bocejos_na_calibracao(quadros):
     jan_mar = deque(maxlen=MAR_SMOOTHING_WINDOW)
     jan_jaw = deque(maxlen=MAR_SMOOTHING_WINDOW)
     t = None
-    for t, _e, m, _p, j in quadros:
+    for t, _e, m, _p, j, *_ in quadros:
         if m is not None:
             jan_mar.append(m)
         if j is not None:
@@ -755,13 +778,13 @@ def calibrar_quadros(quadros):
     mulheres tinham o bocejo dentro dos 5 s de calibração). O bocejo em si
     não é descartado: quem boceja ao ligar o sistema já está cansado, então
     ele volta em bocejos (instantes de fim) pra entrar na contagem.
-    quadros: (t, ear, mar, pitch, jaw) por frame. Retorna o mesmo que
-    calibrar_amostras() mais bocejos."""
+    quadros: (t, ear, mar, pitch, jaw[, sorriso]) por frame. Retorna o mesmo
+    que calibrar_amostras() mais bocejos."""
     fechados = [q for q in quadros if not _boca_aberta(q[2], q[4])]
     ear_b, mar_b, pitch_b, warning = calibrar_amostras(
-        [e for _t, e, _m, _p, _j in fechados if e is not None],
-        [m for _t, _e, m, _p, _j in fechados if m is not None],
-        [p for _t, _e, _m, p, _j in fechados if p is not None],
+        [q[1] for q in fechados if q[1] is not None],
+        [q[2] for q in fechados if q[2] is not None],
+        [q[3] for q in fechados if q[3] is not None],
     )
     abertos = len(quadros) - len(fechados)
     if abertos:
@@ -770,6 +793,16 @@ def calibrar_quadros(quadros):
                  else f"{abertos} frames de boca aberta descartados da calibração (bocejo ou fala)")
         warning = f"{warning}; {aviso}" if warning else aviso
     return ear_b, mar_b, pitch_b, warning, bocejos_na_calibracao(quadros)
+
+
+def sorriso_neutro(quadros):
+    """Sorriso da boca em repouso (mediana nos frames de boca fechada da
+    calibração), ou None sem amostras. Tem gente com o canto da boca
+    naturalmente pra cima: sem essa referência o rosto sério já pareceria
+    sorriso. Fica só na memória, como o EAR."""
+    amostras = [q[5] for q in quadros
+                if len(q) > 5 and q[5] is not None and not _boca_aberta(q[2], q[4])]
+    return float(np.median(amostras)) if len(amostras) >= MIN_CALIB_SAMPLES else None
 
 
 def calibrar_amostras(ear_samples, mar_samples, pitch_samples):
@@ -821,6 +854,7 @@ class DrowsinessState:
         smoothing_window=SMOOTHING_WINDOW,
         mar_smoothing_window=MAR_SMOOTHING_WINDOW,
         no_face_grace=NO_FACE_GRACE_SECONDS,
+        smile_baseline=None,
     ):
         self.ear_threshold = ear_threshold
         self.ear_almost_closed = ear_almost_closed
@@ -860,24 +894,29 @@ class DrowsinessState:
         self.perclos_tracker = PerclosTracker()
         self.mouth_openings = deque()   # instantes em que o MAR cruzou TALKING_MAR subindo
         self.last_mar_raw = None
+        self.smile_baseline = smile_baseline   # None: regra do sorriso desligada
+        self.last_smile_t = None
 
     def registrar_bocejo(self, t):
         """Conta um bocejo visto fora do monitoramento (durante a calibração)."""
         self.yawn_events.record(t)
 
-    def update(self, left_ear, right_ear, mar, head_pitch, eyes_dark, face_detected, t, jaw_open=None):
+    def update(self, left_ear, right_ear, mar, head_pitch, eyes_dark, face_detected, t, jaw_open=None,
+               smile=None):
         """Igual a _update, mais a chave "distraido": rosto sumido há mais de
         DISTRACTION_SECONDS depois de já ter sido visto (sem rosto desde o
         início não conta: pode ser a câmera ainda sendo posicionada).
-        jaw_open: blendshape jawOpen do MediaPipe (0 a 1), se disponível."""
-        st = self._update(left_ear, right_ear, mar, head_pitch, eyes_dark, face_detected, t, jaw_open)
+        jaw_open: blendshape jawOpen do MediaPipe (0 a 1), se disponível.
+        smile: sorriso de 0 a 1 (ver sorriso()), se disponível."""
+        st = self._update(left_ear, right_ear, mar, head_pitch, eyes_dark, face_detected, t, jaw_open, smile)
         sem_rosto = None if st["face_detected"] or self.last_face_seen is None else t - self.last_face_seen
         st["distraido"] = sem_rosto is not None and DISTRACTION_SECONDS <= sem_rosto < DISTRACTION_MAX_SECONDS
         if st["distraido"]:
             st["status"] = f"SEM ROSTO ha {sem_rosto:.0f}s: OLHE PARA A ESTRADA"
         return st
 
-    def _update(self, left_ear, right_ear, mar, head_pitch, eyes_dark, face_detected, t, jaw_open=None):
+    def _update(self, left_ear, right_ear, mar, head_pitch, eyes_dark, face_detected, t, jaw_open=None,
+                smile=None):
         """t: tempo do stream em segundos. eyes_dark: True/False se foi
         possível medir o contraste da região do olho nesse frame, None se
         não (ex.: sem frame de imagem disponível). Retorna um dict com
@@ -911,8 +950,13 @@ class DrowsinessState:
             while self.mouth_openings and t - self.mouth_openings[0] > TALKING_WINDOW_SECONDS:
                 self.mouth_openings.popleft()
             talking = len(self.mouth_openings) >= TALKING_MIN_OPENINGS
+            # sorrindo/rindo: mesma folga da fala (olho fechado numa risada não
+            # é cochilo). Só com o neutro da calibração: sem ele, desligado
+            if smile is not None and self.smile_baseline is not None and smile - self.smile_baseline > SMILE_DELTA:
+                self.last_smile_t = t
+            sorrindo = self.last_smile_t is not None and t - self.last_smile_t <= SMILE_GRACE_SECONDS
             closed_alert_s = (max(self.closed_seconds_alert, CLOSED_SECONDS_ALERT_TALKING)
-                              if talking else self.closed_seconds_alert)
+                              if talking or sorrindo else self.closed_seconds_alert)
             mar_med = float(np.median(self.mar_smooth)) if self.mar_smooth else None
             if jaw_open is not None:
                 self.jaw_smooth.append(jaw_open)
@@ -942,8 +986,11 @@ class DrowsinessState:
             # PERCLOS conta com o EAR bruto (both_closed), não com o glasses_mode
             # aplicado — mas em modo óculos escuros o EAR não é confiável, então
             # trata como "não fechado" pra não viciar a métrica com leitura ruim.
+            # Olho fechado no bocejo também não entra: é fadiga, que tem aviso
+            # próprio, não sono (nos vídeos do painel do YawDD, a maior parte
+            # dos avisos de PERCLOS era olho fechado bocejando)
             perclos_closed = l_med < self.perclos_ear_threshold and r_med < self.perclos_ear_threshold
-            self.perclos_tracker.update(t, perclos_closed and not glasses_mode)
+            self.perclos_tracker.update(t, perclos_closed and not glasses_mode and not yawn_related)
             perclos_value = self.perclos_tracker.value()
 
             if glasses_mode:
@@ -971,7 +1018,8 @@ class DrowsinessState:
                     color = (0, 0, 255)
                 else:
                     level = "fechando"
-                    status = f"olhos fechando... ({closed_dur:.1f}s)"
+                    status = (f"olhos fechados sorrindo ({closed_dur:.1f}s)" if sorrindo
+                              else f"olhos fechando... ({closed_dur:.1f}s)")
                     color = (0, 165, 255)
             else:
                 # Piscada terminando: se o olho ficou fechado por mais que
@@ -981,7 +1029,7 @@ class DrowsinessState:
                 # Ignora se foi bocejo (mesmo motivo do "fechado" acima).
                 if self.closed_since is not None:
                     blink_dur = t - self.closed_since
-                    if LONG_BLINK_SECONDS <= blink_dur < closed_alert_s and not yawn_related:
+                    if LONG_BLINK_SECONDS <= blink_dur < closed_alert_s and not yawn_related and not sorrindo:
                         self.long_blink_tracker.record(t)
                 self.closed_since = None
                 if both_almost:

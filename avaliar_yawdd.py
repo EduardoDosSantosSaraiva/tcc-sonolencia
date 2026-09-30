@@ -128,7 +128,7 @@ def _extrair(path, destino):
                            # colunas 7 e 8: medidas de boca em estudo, fora da decisão
                            nan if pf["abertura_boca"] is None else pf["abertura_boca"],
                            nan if pf["abertura_boca_ext"] is None else pf["abertura_boca_ext"],
-                           # 9: nariz-queixo; 10-13: blendshapes (core.BLENDSHAPES_USADOS)
+                           # 9: nariz-queixo; 10 em diante: blendshapes, na ordem de core.BLENDSHAPES_USADOS
                            nan if pf["queixo"] is None else pf["queixo"],
                            *(pf["blendshapes"].get(n, nan) for n in core.BLENDSHAPES_USADOS)))
     finally:
@@ -153,8 +153,12 @@ def simular(serie):
     import core
     import eye_fatigue as ef
 
-    # séries novas trazem jawOpen na coluna 10 (ver _extrair); as antigas não
+    # séries novas trazem jawOpen na coluna 10 e o sorriso nas colunas de
+    # mouthSmile (ver _extrair); as antigas não
     jaw = serie[:, 10] if serie.shape[1] > 10 else np.full(len(serie), np.nan)
+    c_sorriso = [10 + core.BLENDSHAPES_USADOS.index(n) for n in ("mouthSmileLeft", "mouthSmileRight")]
+    sorriso = (serie[:, c_sorriso].mean(axis=1) if serie.shape[1] > max(c_sorriso)
+               else np.full(len(serie), np.nan))
     serie = serie[:, :7]
     t0 = serie[0, 0] if len(serie) else 0.0
     # mesma regra de parada do core.calibrate: junta CALIBRATION_SECONDS de
@@ -169,11 +173,11 @@ def simular(serie):
         _t, l, r, m, p, _d, face = serie[i]
         if face:
             quadros.append((t, (l + r) / 2 if l == l and r == r else None,
-                            m if m == m else None, p if p == p else None, _v(jaw[i])))
+                            m if m == m else None, p if p == p else None, _v(jaw[i]), _v(sorriso[i])))
         i += 1
     ear_b, mar_b, pitch_b, _aviso, bocejos_calib = core.calibrar_quadros(quadros)
     with contextlib.redirect_stdout(io.StringIO()):   # build_state imprime os limiares
-        state = ef.build_state(ear_b, mar_b, pitch_b)
+        state = ef.build_state(ear_b, mar_b, pitch_b, core.sorriso_neutro(quadros))
     for t_b in bocejos_calib:
         state.registrar_bocejo(t_b)
 
@@ -182,10 +186,11 @@ def simular(serie):
     mar_max = 0.0
     prev = {"fechado": False, "bocejos": 0, "piscadas": 0, "cabeca": 0}
     t = t0
-    for (t, l, r, m, p, d, face), j in zip(serie[i:], jaw[i:]):
+    for (t, l, r, m, p, d, face), j, sr in zip(serie[i:], jaw[i:], sorriso[i:]):
         frames += 1
         com_rosto += bool(face)
-        st = state.update(_v(l), _v(r), _v(m), _v(p), None if d != d else bool(d), bool(face), t, jaw_open=_v(j))
+        st = state.update(_v(l), _v(r), _v(m), _v(p), None if d != d else bool(d), bool(face), t,
+                          jaw_open=_v(j), smile=_v(sr))
         if st["mar"] is not None:
             mar_max = max(mar_max, st["mar"])
         fechado = st["level"] == "fechado"
