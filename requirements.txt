@@ -11,4 +11,7 @@ mediapipe==1.0.1
 numpy==2.2.4
 opencv-contrib-python==5.0.0.93
 piper-tts==1.8.0
+# só pra gerar_vozes.py (as falas ficam pré-gravadas, não roda no uso normal)
+kokoro-onnx==0.6.1
+soundfile==0.14.0
 pytest==9.1.1

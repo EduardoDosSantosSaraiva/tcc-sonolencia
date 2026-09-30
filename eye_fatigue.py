@@ -19,11 +19,13 @@ Requer o modelo face_landmarker.task na mesma pasta (ver core.build_landmarker).
 """
 
 import argparse
+import hashlib
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from pathlib import Path
 
@@ -79,16 +81,80 @@ FATIGUE_REPEAT_SECONDS = 10.0   # aviso específico de bocejo — nunca dispara
                                   # o alarme cheio (ver core.DrowsinessState),
                                   # só esse aviso leve de fadiga/cansaço
 
+DISTRACTION_SOUND_PATH = Path(__file__).parent / "aviso_distracao.wav"
+DISTRACTION_REPEAT_SECONDS = 6.0   # rosto sumido (core.DISTRACTION_SECONDS):
+                                     # repete enquanto o motorista não voltar
+                                     # a olhar pra frente
+
+BUZZER_GPIO = 26          # buzzer ativo reserva (GPIO26 = pino físico 37, GND no
+                          # pino 39). Só toca quando o fone Bluetooth cai, junto
+                          # com o alarme cheio ou o aviso de distração. Pinos
+                          # 1-26 ficam por baixo da tela piscreen, que ainda usa
+                          # o GPIO17 pro touch, 24/25 e o SPI0
+BUZZER_HOLD_SECONDS = 8.0   # mesmo tempo do alerta.wav: o alarme nunca corta
+                              # no meio, nem no buzzer
+
+CALIB_TENTATIVAS = 3      # calibração que falha ou sai fora do normal é refeita
+CALIB_DESVIO_MAX = 0.20   # EAR calibrado mais de 20% longe da mediana das
+                          # calibrações anteriores = provavelmente olho
+                          # arregalado ou postura errada (aconteceu em 23/09:
+                          # 0,320 contra ~0,24 de sempre, e o autoteste caiu
+                          # de 7/8 pra 4/8)
+CALIB_HISTORICO_MIN = 3   # com menos calibrações boas que isso, não compara
+
+FALA_CALIB_INICIO = ("Calibração em três segundos. Sente como se estivesse dirigindo, "
+                     "olhe para a frente com os olhos relaxados e a boca fechada.")
+FALA_CALIB_SEM_OLHO = "Não consegui ver seus olhos. Ajuste a câmera ou a sua posição. Vou calibrar de novo."
+FALA_CALIB_DIFERENTE = ("A calibração ficou diferente do normal. Olhe para a frente, "
+                        "sem arregalar os olhos. Vou calibrar de novo.")
+FALA_CALIB_BOCA = ("Não consegui calibrar com a boca aberta. "
+                   "Fique com a boca fechada por alguns segundos. Vou calibrar de novo.")
+FALA_CALIB_OK = "Calibração concluída. Monitoramento ativo."
+FALA_CALIB_PADRAO = "Não consegui calibrar. Vou usar os valores padrão, mas confira a câmera."
+FALA_FONE_CAIU = "Atenção: o fone desconectou. Os alarmes vão tocar na saída de som reserva."
+FALA_FONE_VOLTOU = "Fone conectado de novo."
+FRASES_PROGRAMA = [FALA_CALIB_INICIO, FALA_CALIB_SEM_OLHO, FALA_CALIB_DIFERENTE, FALA_CALIB_BOCA, FALA_CALIB_OK,
+                   FALA_CALIB_PADRAO, FALA_FONE_CAIU, FALA_FONE_VOLTOU]   # pré-gravadas (gerar_vozes.py)
+
 PIPER_BIN = Path(__file__).parent / "venv" / "bin" / "piper"
 TTS_MODEL_PATH = Path(__file__).parent / "tts_model" / "pt_BR-faber-medium.onnx"
 
+# Falas pré-gravadas com a voz Kokoro (gerar_vozes.py). Síntese na hora não
+# serve: o Kokoro leva ~3x o tempo real no Pi 5. Como toda frase falada pelo
+# programa é fixa, ela é gerada uma vez e tocada do arquivo; o Piper fica só
+# de reserva pra alguma frase que não tenha sido gerada.
+VOICE_DIR = Path(__file__).parent / "vozes"
+
+
+def voice_file(text):
+    return VOICE_DIR / (hashlib.sha1(text.encode("utf-8")).hexdigest()[:16] + ".wav")
+
+
+def frase_resultado(passou, detalhe):
+    return f"{'Certo' if passou else 'Atenção'}: {detalhe}."
+
+
+def frase_conclusao(ok_count, total):
+    return f"Autoteste concluído. {ok_count} de {total} cenários passaram."
+
 
 def speak_blocking(text, player):
-    """Sintetiza a frase com o Piper e toca, esperando terminar antes de
-    voltar — o autoteste guiado é sequencial de propósito (fala a instrução,
-    só depois começa a contar o tempo do cenário), diferente do AlertPlayer
-    (que é assíncrono pra não travar o loop de detecção)."""
-    if player is None or not PIPER_BIN.exists() or not TTS_MODEL_PATH.exists():
+    """Toca a frase (pré-gravada em vozes/, ou sintetizada com o Piper se não
+    houver arquivo), esperando terminar antes de voltar — o autoteste guiado
+    é sequencial de propósito (fala a instrução, só depois começa a contar o
+    tempo do cenário), diferente do AlertPlayer (que é assíncrono pra não
+    travar o loop de detecção)."""
+    if player is None:
+        print(f"[fala] {text}")
+        return
+    pre = voice_file(text)
+    if pre.exists():
+        try:
+            subprocess.run([player, str(pre)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30)
+        except Exception as e:
+            print(f"Aviso: falha ao tocar a fala ({e}).")
+        return
+    if not PIPER_BIN.exists() or not TTS_MODEL_PATH.exists():
         print(f"[fala] {text}")
         return
     wav_path = None
@@ -108,6 +174,86 @@ def speak_blocking(text, player):
                 os.unlink(wav_path)
             except OSError:
                 pass
+
+
+def speak_async(text, player):
+    """Toca uma fala pré-gravada sem esperar (usado de dentro da thread do
+    AudioOutputMonitor, que não pode travar)."""
+    pre = voice_file(text)
+    if player is None or not pre.exists():
+        print(f"[fala] {text}")
+        return
+    subprocess.Popen([player, str(pre)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+class AudioOutputMonitor:
+    """Vigia se a saída de som padrão continua sendo o fone Bluetooth. Se o
+    fone desconectar (bateria, alcance), o PipeWire passa a tocar na saída
+    seguinte (HDMI/alto-falante) sozinho; o monitor avisa por voz, marca
+    fone_ok=False pro loop principal ligar o buzzer reserva e mostrar o aviso
+    na tela. Só vigia se o programa começou com fone: sem fone desde o início
+    não há o que perder. Roda numa thread porque o wpctl leva alguns ms e o
+    loop de detecção não pode esperar."""
+
+    INTERVAL_SECONDS = 3.0
+
+    def __init__(self, player):
+        self.player = player
+        self.fone_ok = self._fone_conectado()
+        self._parar = threading.Event()
+        if self.fone_ok:
+            threading.Thread(target=self._loop, daemon=True).start()
+        elif self.fone_ok is False:
+            print("Aviso: a saída de som não é um fone Bluetooth; alarmes tocam na saída padrão.")
+
+    @staticmethod
+    def _fone_conectado():
+        """True/False se deu pra consultar o PipeWire, None se não deu."""
+        try:
+            out = subprocess.run(["wpctl", "inspect", "@DEFAULT_AUDIO_SINK@"],
+                                 capture_output=True, text=True, timeout=2).stdout
+        except Exception:
+            return None
+        return "bluez" in out
+
+    def _loop(self):
+        while not self._parar.wait(self.INTERVAL_SECONDS):
+            ok = self._fone_conectado()
+            if ok is None or ok == self.fone_ok:
+                continue
+            self.fone_ok = ok
+            print("Fone Bluetooth reconectado." if ok else "FONE BLUETOOTH DESCONECTOU: usando saída reserva e buzzer.")
+            speak_async(FALA_FONE_VOLTOU if ok else FALA_FONE_CAIU, self.player)
+
+    def stop(self):
+        self._parar.set()
+
+
+class BuzzerReserva:
+    """Buzzer ativo no GPIO, alarme de reserva pra quando o fone cai. Sem o
+    buzzer ligado fisicamente, o GPIO só muda de nível e nada acontece."""
+
+    def __init__(self, pin=BUZZER_GPIO):
+        self.buzzer = None
+        self.ligado = False
+        try:
+            from gpiozero import Buzzer
+            self.buzzer = Buzzer(pin)
+        except Exception as e:
+            print(f"Buzzer reserva no GPIO{pin} indisponível ({e}).")
+
+    def set(self, ligar):
+        if self.buzzer is None or ligar == self.ligado:
+            return
+        if ligar:
+            self.buzzer.beep(on_time=0.2, off_time=0.2)
+        else:
+            self.buzzer.off()
+        self.ligado = ligar
+
+    def close(self):
+        if self.buzzer is not None:
+            self.buzzer.close()
 
 
 class AlertPlayer:
@@ -168,7 +314,11 @@ def parse_args():
     ap.add_argument("--db", type=Path, default=Path(__file__).parent / "sonolencia.db", help="Banco SQLite pra log da sessão")
     ap.add_argument("--no-log", action="store_true", help="Não grava log da sessão")
     ap.add_argument("--no-sound", action="store_true", help="Não toca o alarme sonoro no estado 'fechado'")
+    ap.add_argument("--buzzer-gpio", type=int, default=BUZZER_GPIO,
+                    help=f"GPIO do buzzer reserva, usado se o fone Bluetooth cair (padrão {BUZZER_GPIO}; 0 desliga)")
     ap.add_argument("--modo-teste", action="store_true", help="Autoteste guiado por voz pelos 8 cenários do protocolo_testes.md")
+    ap.add_argument("--cenario", type=int, nargs="+", metavar="N",
+                    help="Com --modo-teste, roda só esses cenários (ex.: --cenario 7)")
     return ap.parse_args()
 
 
@@ -242,7 +392,7 @@ def process_frame(landmarker, timestamp, MpImage, MpImageFormat, infer_frame, iw
     latency_ms = (time.perf_counter() - t_infer_start) * 1000
 
     left_ear = right_ear = mar = head_pitch = eyes_dark = None
-    eye_bright = face_bright = None
+    eye_bright = face_bright = abertura_boca = abertura_boca_ext = queixo = None
     idx = core.select_driver_index(result.face_landmarks)
     landmarks = result.face_landmarks[idx] if idx is not None else None
     face_detected = landmarks is not None
@@ -250,6 +400,9 @@ def process_frame(landmarker, timestamp, MpImage, MpImageFormat, infer_frame, iw
         left_ear = core.eye_aspect_ratio(landmarks, core.LEFT_EYE, iw, ih)
         right_ear = core.eye_aspect_ratio(landmarks, core.RIGHT_EYE, iw, ih)
         mar = core.mouth_aspect_ratio(landmarks, core.MOUTH, iw, ih)
+        abertura_boca = core.mouth_opening_ratio(landmarks, iw, ih)
+        abertura_boca_ext = core.mouth_opening_ratio(landmarks, iw, ih, core.OUTER_LIPS)
+        queixo = core.jaw_drop_ratio(landmarks, iw, ih)
         head_pitch = core.head_drop_ratio(landmarks, iw, ih)
         eye_bright, face_bright = core.eye_region_darkness(infer_frame, landmarks, iw, ih)
         if eye_bright is not None and face_bright is not None and face_bright > core.DARK_EYES_MIN_FACE_BRIGHTNESS:
@@ -260,14 +413,42 @@ def process_frame(landmarker, timestamp, MpImage, MpImageFormat, infer_frame, iw
         "head_pitch": head_pitch, "eyes_dark": eyes_dark,
         "eye_bright": eye_bright, "face_bright": face_bright,
         "face_detected": face_detected, "landmarks": landmarks,
+        "abertura_boca": abertura_boca, "abertura_boca_ext": abertura_boca_ext,
+        "queixo": queixo, "blendshapes": core.blendshapes_do_rosto(result, idx),
         "latency_ms": latency_ms,
     }
 
 
-def run_calibration(source, landmarker, headless, cv2):
-    wait_for_ready(source, headless, cv2)
-    print(f"Calibrando pra valer... olhos e boca fechados, cabeça reta, "
-          f"por {core.CALIBRATION_SECONDS:.0f}s.")
+def historico_ear(n=10):
+    """Mediana do EAR das últimas n calibrações que deram certo, ou None se
+    ainda não há calibrações suficientes pra comparar."""
+    try:
+        linhas = CALIBRATION_LOG_PATH.read_text().splitlines()
+    except OSError:
+        return None
+    valores = []
+    for linha in linhas:
+        for campo in linha.split():
+            if campo.startswith("EAR=") and campo != "EAR=FALHOU":
+                try:
+                    valores.append(float(campo[4:]))
+                except ValueError:
+                    pass
+    valores = sorted(valores[-n:])
+    if len(valores) < CALIB_HISTORICO_MIN:
+        return None
+    meio = len(valores) // 2
+    return valores[meio] if len(valores) % 2 else (valores[meio - 1] + valores[meio]) / 2
+
+
+def run_calibration(source, landmarker, headless, cv2, player=None, conferir=True):
+    """Calibra, falando as instruções. Se não achar o olho, ou se o EAR sair
+    muito longe do histórico (conferir=True), explica por voz e refaz, até
+    CALIB_TENTATIVAS vezes. Na última tentativa aceita o que tiver: EAR
+    diferente pode ser só outra pessoa dirigindo. conferir=False (vídeo
+    gravado) calibra uma vez só, sem comparar com o histórico do motorista."""
+    referencia = historico_ear() if conferir else None
+    tentativas = CALIB_TENTATIVAS if conferir else 1
 
     def on_frame(display_frame, remaining):
         if headless or display_frame is None:
@@ -280,18 +461,47 @@ def run_calibration(source, landmarker, headless, cv2):
         cv2.imshow(WINDOW_NAME, disp)
         cv2.waitKey(1)
 
-    ear_baseline, mar_baseline, pitch_baseline, warning = core.calibrate(source, landmarker, on_frame=on_frame)
-    if warning:
-        print(f"Aviso na calibração: {warning}.")
+    bocejos_total = []   # bocejo numa tentativa que foi refeita também conta
+    for tentativa in range(1, tentativas + 1):
+        if conferir:
+            speak_blocking(FALA_CALIB_INICIO, player)
+        wait_for_ready(source, headless, cv2)
+        print(f"Calibrando pra valer (tentativa {tentativa}/{tentativas})... olhos abertos e relaxados, "
+              f"boca fechada, cabeça reta, por {core.CALIBRATION_SECONDS:.0f}s.")
+        ear_baseline, mar_baseline, pitch_baseline, warning, bocejos = core.calibrate(
+            source, landmarker, on_frame=on_frame)
+        if bocejos:
+            print(f"{len(bocejos)} bocejo(s) durante a calibração: entram na contagem de bocejos.")
+            bocejos_total += bocejos
+        problema = None
+        if ear_baseline is None:
+            # mesmo estendendo a calibração até CALIBRATION_MAX_SECONDS não
+            # sobrou rosto em repouso suficiente: ou a boca ficou aberta, ou
+            # o olho não foi achado
+            problema = FALA_CALIB_BOCA if warning and "maior parte" in warning else FALA_CALIB_SEM_OLHO
+        elif referencia and abs(ear_baseline - referencia) / referencia > CALIB_DESVIO_MAX:
+            problema = FALA_CALIB_DIFERENTE
+            warning = (f"EAR {ear_baseline:.3f} a {100 * abs(ear_baseline - referencia) / referencia:.0f}% "
+                       f"da mediana das calibrações anteriores ({referencia:.3f})")
+        if warning:
+            print(f"Aviso na calibração: {warning}.")
+        if conferir:   # vídeo gravado é de outra pessoa: não entra no histórico do motorista
+            log_calibration(ear_baseline, mar_baseline, pitch_baseline, warning)
+        if problema is None or tentativa == tentativas:
+            break
+        speak_blocking(problema, player)
+
     if ear_baseline is None:
         print("Usando limiares padrão (sem calibração válida de olho).")
-        log_calibration(None, mar_baseline, pitch_baseline, warning)
-        return None, None, None
+        if conferir:
+            speak_blocking(FALA_CALIB_PADRAO, player)
+        return None, None, None, bocejos_total
     print(f"Calibração concluída. EAR olho aberto: {ear_baseline:.3f}"
           + (f"  MAR boca fechada: {mar_baseline:.3f}" if mar_baseline else "  MAR: sem amostras suficientes")
           + (f"  pitch neutro: {pitch_baseline:.3f}" if pitch_baseline is not None else "  pitch: sem amostras suficientes"))
-    log_calibration(ear_baseline, mar_baseline, pitch_baseline, warning)
-    return ear_baseline, mar_baseline, pitch_baseline
+    if conferir:
+        speak_blocking(FALA_CALIB_OK, player)
+    return ear_baseline, mar_baseline, pitch_baseline, bocejos_total
 
 
 # ---------------------------------------------------------------------------
@@ -300,102 +510,95 @@ def run_calibration(source, landmarker, headless, cv2):
 # o sinal esperado foi detectado — sem precisar preencher planilha na mão.
 # ---------------------------------------------------------------------------
 
+SELF_TEST_INTRO = (
+    "Modo de autoteste. Vou guiar você por oito cenários, um de cada vez. "
+    "Escute a instrução e faça o que eu pedir."
+)
+
 SELF_TEST_SCENARIOS = [
     (
         "Baseline",
-        "Cenário um, linha de base. Fique parado, olhando pra câmera normalmente, por quinze segundos.",
+        "Cenário um, linha de base. Fique parado, olhando para a frente como se estivesse dirigindo, por quinze segundos.",
         15,
-        lambda b, a: (
-            not a["reached_fechado"] and a["blink_count"] == b["blink_count"],
-            "sem alarme nem piscada longa à toa"
-            if not a["reached_fechado"] and a["blink_count"] == b["blink_count"]
-            else "disparou alarme ou piscada longa à toa",
-        ),
+        lambda b, a: not a["reached_fechado"] and a["blink_count"] == b["blink_count"],
+        "sem alarme nem piscada longa à toa",
+        "disparou alarme ou piscada longa à toa",
     ),
     (
         "Piscada normal",
         "Cenário dois, piscada normal. Pisque algumas vezes, normalmente, por dez segundos.",
         10,
-        lambda b, a: (
-            a["blink_count"] == b["blink_count"],
-            "nenhuma piscada longa contada"
-            if a["blink_count"] == b["blink_count"]
-            else "piscada normal foi contada como longa",
-        ),
+        lambda b, a: a["blink_count"] == b["blink_count"],
+        "nenhuma piscada longa contada",
+        "piscada normal foi contada como longa",
     ),
     (
         "Piscada longa",
         "Cenário três, piscada longa. Feche o olho por quase um segundo, e abra.",
         6,
-        lambda b, a: (
-            a["blink_count"] > b["blink_count"] and not a["reached_fechado"],
-            "piscada longa contada, sem disparar o alarme cheio"
-            if a["blink_count"] > b["blink_count"] and not a["reached_fechado"]
-            else "não contou a piscada longa, ou disparou o alarme cheio",
-        ),
+        lambda b, a: a["blink_count"] > b["blink_count"] and not a["reached_fechado"],
+        "piscada longa contada, sem disparar o alarme cheio",
+        "não contou a piscada longa, ou disparou o alarme cheio",
     ),
     (
         "Microssono",
         "Cenário quatro, microssono. Feche o olho e segure por dois segundos ou mais.",
         8,
-        lambda b, a: (
-            a["reached_fechado"],
-            "alarme cheio disparou" if a["reached_fechado"] else "alarme cheio não disparou",
-        ),
+        lambda b, a: a["reached_fechado"],
+        "alarme cheio disparou",
+        "alarme cheio não disparou",
     ),
     (
         "Fala normal",
-        "Cenário cinco, fala normal. Fale alguma coisa, naturalmente, olhando pra câmera.",
+        "Cenário cinco, fala normal. Fale alguma coisa, naturalmente, olhando para a frente.",
         15,
-        lambda b, a: (
-            a["yawn_count"] == b["yawn_count"],
-            "nenhum bocejo contado à toa"
-            if a["yawn_count"] == b["yawn_count"]
-            else "fala foi confundida com bocejo",
-        ),
+        lambda b, a: a["yawn_count"] == b["yawn_count"],
+        "nenhum bocejo contado à toa",
+        "fala foi confundida com bocejo",
     ),
     (
         "Bocejo real",
         "Cenário seis, bocejo real. Boceje de verdade, pode fechar o olho.",
         8,
-        lambda b, a: (
-            a["yawn_count"] > b["yawn_count"] and not a["reached_fechado"],
-            "bocejo contado, sem disparar o alarme cheio"
-            if a["yawn_count"] > b["yawn_count"] and not a["reached_fechado"]
-            else "não contou o bocejo, ou disparou o alarme cheio",
-        ),
+        lambda b, a: a["yawn_count"] > b["yawn_count"] and not a["reached_fechado"],
+        "bocejo contado, sem disparar o alarme cheio",
+        "não contou o bocejo, ou disparou o alarme cheio",
     ),
     (
         "Cabeça caindo",
-        "Cenário sete, cabeça caindo. Deixe a cabeça pender pra frente por um segundo.",
-        6,
-        lambda b, a: (
-            a["head_down_count"] > b["head_down_count"],
-            "queda de cabeça contada"
-            if a["head_down_count"] > b["head_down_count"]
-            else "não contou a queda de cabeça (confira se a calibração de pitch rodou)",
-        ),
+        "Cenário sete, cochilo com a cabeça caindo. Feche os olhos e deixe a cabeça pender pra frente por dois segundos.",
+        8,
+        # passa se a queda foi contada OU se ainda está em andamento mas já
+        # durou o suficiente (a contagem só fecha quando a cabeça sobe, e a
+        # pessoa pode ainda estar de cabeça baixa quando a janela acaba)
+        lambda b, a: a["head_down_count"] > b["head_down_count"] or a["reached_head_down"],
+        "queda de cabeça contada",
+        "não contou a queda de cabeça (confira se a calibração de pitch rodou)",
     ),
     (
-        "Óculos escuros",
-        "Cenário oito, óculos escuros. Coloque um óculos escuro de verdade, com lente escura, por cinco segundos. "
-        "Cobrir com a mão não funciona, a detecção depende do escurecimento óptico da lente.",
-        8,
-        lambda b, a: (
-            a["reached_glasses"],
-            "modo óculos escuros ativou" if a["reached_glasses"] else "modo óculos escuros não ativou",
-        ),
+        # O que importa de óculos é o sistema não ficar cego sem saber: ou
+        # enxerga o olho através da lente (lente clara/polarizada, o EAR segue
+        # valendo e o microssono dispara) ou percebe que não enxerga e entra no
+        # modo óculos (lente escura, passa a vigiar boca/cabeça). Falha só se
+        # nenhum dos dois acontecer.
+        "Óculos",
+        "Cenário oito, óculos. Coloque os óculos, escuro ou polarizado, e olhe para a frente por cinco segundos. "
+        "Depois feche o olho e segure por três segundos.",
+        12,
+        lambda b, a: a["reached_fechado"] or a["reached_glasses"],
+        "de óculos, o sistema detectou o olho fechado ou entrou no modo óculos",
+        "de óculos, o olho fechado não foi detectado e o modo óculos não ativou",
     ),
 ]
 
 
-def run_guided_self_test(source, landmarker, state, cv2, MpImage, MpImageFormat, timestamp, headless, player):
+def run_guided_self_test(source, landmarker, state, cv2, MpImage, MpImageFormat, timestamp, headless, player,
+                         cenarios=None):
+    """cenarios: números (1 a 8) pra rodar só esses; None roda todos."""
     print("\n=== MODO AUTOTESTE GUIADO (ver protocolo_testes.md) ===")
-    speak_blocking(
-        "Modo de autoteste. Vou guiar você por oito cenários, um de cada vez. "
-        "Escute a instrução e faça o que eu pedir.",
-        player,
-    )
+    escolhidos = [c for i, c in enumerate(SELF_TEST_SCENARIOS, 1) if not cenarios or i in cenarios]
+    if not cenarios:
+        speak_blocking(SELF_TEST_INTRO, player)
 
     print(f"(limiares em uso: bocejo>{state.mar_threshold:.3f}  "
           + (f"cabeca-caida>{state.head_pitch_threshold:.3f}" if state.head_pitch_threshold is not None
@@ -403,7 +606,7 @@ def run_guided_self_test(source, landmarker, state, cv2, MpImage, MpImageFormat,
 
     resultados = []
     try:
-        for nome, instrucao, duracao, avaliar in SELF_TEST_SCENARIOS:
+        for nome, instrucao, duracao, avaliar, msg_ok, msg_falha in escolhidos:
             speak_blocking(instrucao, player)
             print(f"\n[{nome}] {instrucao}")
 
@@ -416,6 +619,10 @@ def run_guided_self_test(source, landmarker, state, cv2, MpImage, MpImageFormat,
             eyes_dark_seen = False
             dark_ratio_min = None  # menor eye_bright/face_bright visto (quanto
                                      # menor, mais escura a região do olho ficou)
+            # cabeça: tempo com a cabeça baixa, com cabeça baixa E olho
+            # fechando (o que conta), maior episódio e tempo sem rosto
+            cab_baixa_s = cab_conta_s = sem_rosto_s = cab_maior_s = 0.0
+            t_ant = None
             t0 = None
             while True:
                 try:
@@ -434,6 +641,7 @@ def run_guided_self_test(source, landmarker, state, cv2, MpImage, MpImageFormat,
                     st = state.update(
                         pf["left_ear"], pf["right_ear"], pf["mar"], pf["head_pitch"],
                         pf["eyes_dark"], pf["face_detected"], t,
+                        jaw_open=pf["blendshapes"].get("jawOpen"),
                     )
                     snapshot = {
                         "blink_count": st["blink_count_recent"],
@@ -441,11 +649,19 @@ def run_guided_self_test(source, landmarker, state, cv2, MpImage, MpImageFormat,
                         "head_down_count": st["head_down_count_recent"],
                         "reached_fechado": (after or {}).get("reached_fechado", False) or st["level"] == "fechado",
                         "reached_glasses": (after or {}).get("reached_glasses", False) or st["modo_oculos_escuros"],
+                        "reached_head_down": (after or {}).get("reached_head_down", False)
+                        or (st.get("head_down_dur") or 0) >= core.HEAD_DOWN_SECONDS_ALERT,
                     }
                     if before is None:
                         before = dict(snapshot)
                     after = snapshot
 
+                    dt = t - t_ant if t_ant is not None else 0.0
+                    t_ant = t
+                    cab_baixa_s += dt if st.get("head_pitch_down") else 0.0
+                    cab_conta_s += dt if st.get("head_down") else 0.0
+                    sem_rosto_s += dt if not pf["face_detected"] else 0.0
+                    cab_maior_s = max(cab_maior_s, st.get("head_down_dur") or 0.0)
                     if st["ear_avg"] is not None:
                         ear_min = st["ear_avg"] if ear_min is None else min(ear_min, st["ear_avg"])
                         ear_max = st["ear_avg"] if ear_max is None else max(ear_max, st["ear_avg"])
@@ -474,9 +690,14 @@ def run_guided_self_test(source, landmarker, state, cv2, MpImage, MpImageFormat,
                     break
 
             telemetria = (
+                f"EAR min/max: {ear_min:.3f}/{ear_max:.3f}" if ear_min is not None else "EAR: sem amostras"
+            ) + "; " + (
                 f"MAR min/max: {mar_min:.3f}/{mar_max:.3f}" if mar_min is not None else "MAR: sem amostras"
             ) + "; " + (
                 f"pitch min/max: {pitch_min:.3f}/{pitch_max:.3f}" if pitch_min is not None else "pitch: sem amostras"
+            ) + (
+                f"; cabeça baixa {cab_baixa_s:.1f}s, baixa com olho fechando {cab_conta_s:.1f}s, "
+                f"maior episódio {cab_maior_s:.1f}s, sem rosto {sem_rosto_s:.1f}s"
             ) + f"; olho escuro visto: {'sim' if eyes_dark_seen else 'não'}" + (
                 f" (razão brilho olho/rosto mín: {dark_ratio_min:.2f}, limiar<{core.DARK_EYES_BRIGHTNESS_RATIO})"
                 if dark_ratio_min is not None else ""
@@ -487,9 +708,10 @@ def run_guided_self_test(source, landmarker, state, cv2, MpImage, MpImageFormat,
                 resultados.append((nome, False, "sem frames processados", telemetria))
                 continue
 
-            passou, detalhe = avaliar(before, after)
+            passou = bool(avaliar(before, after))
+            detalhe = msg_ok if passou else msg_falha
             print(f"  -> {'passou' if passou else 'nao passou'}: {detalhe}  [{telemetria}]")
-            speak_blocking(f"{'Certo' if passou else 'Atenção'}: {detalhe}.", player)
+            speak_blocking(frase_resultado(passou, detalhe), player)
             resultados.append((nome, passou, detalhe, telemetria))
     except KeyboardInterrupt:
         print("\nAutoteste interrompido pelo usuário.")
@@ -499,7 +721,7 @@ def run_guided_self_test(source, landmarker, state, cv2, MpImage, MpImageFormat,
     for nome, passou, detalhe, telemetria in resultados:
         print(f"  [{'OK' if passou else 'FALHOU'}] {nome}: {detalhe}  [{telemetria}]")
     print(f"\n{ok_count}/{len(resultados)} cenários passaram.")
-    speak_blocking(f"Autoteste concluído. {ok_count} de {len(resultados)} cenários passaram.", player)
+    speak_blocking(frase_conclusao(ok_count, len(resultados)), player)
 
     RESULTS_DIR.mkdir(exist_ok=True)
     fname = RESULTS_DIR / f"{time.strftime('%Y%m%d_%H%M%S')}.md"
@@ -518,7 +740,8 @@ def run_guided_self_test(source, landmarker, state, cv2, MpImage, MpImageFormat,
 
 
 def run_live_monitoring(source, landmarker, state, cv2, MpImage, MpImageFormat, timestamp, headless,
-                         logger, alert_player, attention_player, fatigue_player):
+                         logger, alert_player, attention_player, fatigue_player,
+                         distraction_player=None, audio_monitor=None, buzzer=None):
     """Loop principal de monitoramento ao vivo: captura, detecta, decide o
     nível de sonolência, dispara os alarmes e desenha a janela. Retorna
     (frame_count, perclos_value) pro resumo final impresso no main()."""
@@ -528,6 +751,8 @@ def run_live_monitoring(source, landmarker, state, cv2, MpImage, MpImageFormat, 
     prev_blink_count = 0
     prev_yawn_count = 0
     prev_head_down_count = 0
+    prev_distraido = False
+    buzzer_ate = None
     last_printed_status = None
     frame_count = 0
     perclos_value = 0.0
@@ -565,6 +790,7 @@ def run_live_monitoring(source, landmarker, state, cv2, MpImage, MpImageFormat, 
             st = state.update(
                 pf["left_ear"], pf["right_ear"], pf["mar"], pf["head_pitch"],
                 pf["eyes_dark"], face_detected, t,
+                jaw_open=pf["blendshapes"].get("jawOpen"),
             )
             perclos_value = st["perclos"]
 
@@ -576,6 +802,13 @@ def run_live_monitoring(source, landmarker, state, cv2, MpImage, MpImageFormat, 
                 )
             if fatigue_player:
                 fatigue_player.maybe_play(st["atencao_by_yawn"], t)
+            if distraction_player:
+                distraction_player.maybe_play(st["distraido"], t)
+            fone_caiu = audio_monitor is not None and audio_monitor.fone_ok is False
+            if buzzer:
+                if fone_caiu and (st["level"] == "fechado" or st["distraido"]):
+                    buzzer_ate = t + BUZZER_HOLD_SECONDS
+                buzzer.set(buzzer_ate is not None and t < buzzer_ate)
 
             level_changed = st["level"] != prev_level
             if level_changed and st["level"] == "fechado" and display_frame is not None:
@@ -600,6 +833,9 @@ def run_live_monitoring(source, landmarker, state, cv2, MpImage, MpImageFormat, 
                 if st["head_down_count_recent"] > prev_head_down_count:
                     logger.log_evento(t, "cabeca_caindo")
                 prev_head_down_count = st["head_down_count_recent"]
+                if st["distraido"] and not prev_distraido:
+                    logger.log_evento(t, "distracao")
+            prev_distraido = st["distraido"]
             prev_level = st["level"]
 
             now_wall = time.time()
@@ -633,7 +869,11 @@ def run_live_monitoring(source, landmarker, state, cv2, MpImage, MpImageFormat, 
                     (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2,
                 )
 
-            cv2.putText(display, st["status"], (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, st["color"], 2)
+            cv2.putText(display, st["status"], (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9,
+                        (0, 0, 255) if st["distraido"] else st["color"], 2)
+            if fone_caiu:
+                cv2.putText(display, "FONE DESCONECTADO - alarme na saida reserva", (10, dh - 45),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
             cv2.putText(
                 display,
                 f"PERCLOS(60s): {perclos_value*100:.0f}%  "
@@ -671,6 +911,35 @@ def run_live_monitoring(source, landmarker, state, cv2, MpImage, MpImageFormat, 
     return frame_count, perclos_value
 
 
+def build_state(ear_baseline, mar_baseline, pitch_baseline):
+    """Converte a calibração em limiares e monta o estado de decisão.
+    Compartilhado com avaliar_yawdd.py, pra avaliação no dataset usar
+    exatamente os mesmos limiares do programa ao vivo."""
+    ear_threshold = ear_baseline * core.CLOSED_RATIO if ear_baseline else core.EAR_THRESHOLD_DEFAULT
+    ear_almost_closed = ear_baseline * core.ALMOST_RATIO if ear_baseline else core.EAR_ALMOST_CLOSED_DEFAULT
+    # max(...) com MAR_THRESHOLD_DEFAULT como piso: a razão sozinha quebra
+    # quando a baseline calibrada é muito perto de zero (boca fechada com
+    # esses landmarks mede quase 0 pra algumas pessoas/câmeras — já vimos
+    # baseline de 0.006, o que daria limiar de bocejo de 0.013, disparando
+    # com qualquer movimento de boca).
+    mar_threshold = max(mar_baseline * core.MAR_YAWN_RATIO, core.MAR_THRESHOLD_DEFAULT) if mar_baseline else core.MAR_THRESHOLD_DEFAULT
+    # Pitch depende do ângulo de montagem da câmera — sem calibração por
+    # pessoa não existe "neutro" confiável (um valor absoluto fixo erra
+    # dependendo de como a câmera está apontada), então desativa a detecção
+    # de cabeça em vez de usar um padrão que pode disparar à toa.
+    head_pitch_threshold = pitch_baseline + core.HEAD_DOWN_DELTA if pitch_baseline is not None else None
+    print(f"Limiares em uso: fechado<{ear_threshold:.3f}  quase-fechado<{ear_almost_closed:.3f}  "
+          f"bocejo>{mar_threshold:.3f} (sustenta>{mar_threshold * core.MAR_SUSTAIN_RATIO:.3f})  "
+          + (f"cabeca-caida>{head_pitch_threshold:.3f}" if head_pitch_threshold is not None else "cabeca-caida: desativado (sem calibracao)")
+          + ("" if ear_baseline else "  (EAR padrão, sem calibração)"))
+
+    return core.DrowsinessState(
+        ear_threshold=ear_threshold, ear_almost_closed=ear_almost_closed,
+        perclos_ear_threshold=ear_baseline * core.PERCLOS_CLOSED_RATIO if ear_baseline else None,
+        mar_threshold=mar_threshold, head_pitch_threshold=head_pitch_threshold,
+    )
+
+
 def main():
     args = parse_args()
 
@@ -700,33 +969,17 @@ def main():
 
     logger = None if args.no_log else core.SessionLogger(args.db)
 
+    bocejos_calib = []
     if args.skip_calibration:
         ear_baseline = mar_baseline = pitch_baseline = None
     else:
-        ear_baseline, mar_baseline, pitch_baseline = run_calibration(source, landmarker, headless, cv2)
+        voz = None if args.no_sound else (shutil.which("pw-play") or shutil.which("paplay") or shutil.which("ffplay"))
+        ear_baseline, mar_baseline, pitch_baseline, bocejos_calib = run_calibration(
+            source, landmarker, headless, cv2, player=voz, conferir=not args.video)
 
-    ear_threshold = ear_baseline * core.CLOSED_RATIO if ear_baseline else core.EAR_THRESHOLD_DEFAULT
-    ear_almost_closed = ear_baseline * core.ALMOST_RATIO if ear_baseline else core.EAR_ALMOST_CLOSED_DEFAULT
-    # max(...) com MAR_THRESHOLD_DEFAULT como piso: a razão sozinha quebra
-    # quando a baseline calibrada é muito perto de zero (boca fechada com
-    # esses landmarks mede quase 0 pra algumas pessoas/câmeras — já vimos
-    # baseline de 0.006, o que daria limiar de bocejo de 0.013, disparando
-    # com qualquer movimento de boca).
-    mar_threshold = max(mar_baseline * core.MAR_YAWN_RATIO, core.MAR_THRESHOLD_DEFAULT) if mar_baseline else core.MAR_THRESHOLD_DEFAULT
-    # Pitch depende do ângulo de montagem da câmera — sem calibração por
-    # pessoa não existe "neutro" confiável (um valor absoluto fixo erra
-    # dependendo de como a câmera está apontada), então desativa a detecção
-    # de cabeça em vez de usar um padrão que pode disparar à toa.
-    head_pitch_threshold = pitch_baseline + core.HEAD_DOWN_DELTA if pitch_baseline is not None else None
-    print(f"Limiares em uso: fechado<{ear_threshold:.3f}  quase-fechado<{ear_almost_closed:.3f}  "
-          f"bocejo>{mar_threshold:.3f}  "
-          + (f"cabeca-caida>{head_pitch_threshold:.3f}" if head_pitch_threshold is not None else "cabeca-caida: desativado (sem calibracao)")
-          + ("" if ear_baseline else "  (EAR padrão, sem calibração)"))
-
-    state = core.DrowsinessState(
-        ear_threshold=ear_threshold, ear_almost_closed=ear_almost_closed,
-        mar_threshold=mar_threshold, head_pitch_threshold=head_pitch_threshold,
-    )
+    state = build_state(ear_baseline, mar_baseline, pitch_baseline)
+    for t_bocejo in bocejos_calib:   # entra na janela de frequência e no log (1º frame)
+        state.registrar_bocejo(t_bocejo)
     alert_player = None if args.no_sound else AlertPlayer()
     attention_player = None if args.no_sound else AlertPlayer(
         sound_path=ATTENTION_SOUND_PATH, repeat_seconds=ATTENTION_REPEAT_SECONDS
@@ -734,18 +987,26 @@ def main():
     fatigue_player = None if args.no_sound else AlertPlayer(
         sound_path=FATIGUE_SOUND_PATH, repeat_seconds=FATIGUE_REPEAT_SECONDS
     )
+    distraction_player = None if args.no_sound else AlertPlayer(
+        sound_path=DISTRACTION_SOUND_PATH, repeat_seconds=DISTRACTION_REPEAT_SECONDS
+    )
+    ao_vivo = not args.video and not args.no_sound
+    audio_monitor = AudioOutputMonitor(alert_player.player) if ao_vivo else None
+    buzzer = BuzzerReserva(args.buzzer_gpio) if ao_vivo and args.buzzer_gpio else None
 
     timestamp = core.MonotonicMs()
     player = shutil.which("pw-play") or shutil.which("paplay") or shutil.which("ffplay")
 
     try:
         if args.modo_teste:
-            run_guided_self_test(source, landmarker, state, cv2, MpImage, MpImageFormat, timestamp, headless, player)
+            run_guided_self_test(source, landmarker, state, cv2, MpImage, MpImageFormat, timestamp, headless, player,
+                                 cenarios=args.cenario)
             frame_count, perclos_value = 0, 0.0
         else:
             frame_count, perclos_value = run_live_monitoring(
                 source, landmarker, state, cv2, MpImage, MpImageFormat, timestamp, headless,
                 logger, alert_player, attention_player, fatigue_player,
+                distraction_player, audio_monitor, buzzer,
             )
     finally:
         landmarker.close()
@@ -758,6 +1019,12 @@ def main():
             attention_player.stop()
         if fatigue_player:
             fatigue_player.stop()
+        if distraction_player:
+            distraction_player.stop()
+        if audio_monitor:
+            audio_monitor.stop()
+        if buzzer:
+            buzzer.close()
         try:
             cv2.destroyAllWindows()
         except Exception:
