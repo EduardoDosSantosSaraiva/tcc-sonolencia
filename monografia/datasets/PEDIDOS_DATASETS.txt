@@ -1,0 +1,118 @@
+PEDIDOS DE ACESSO AOS DATASETS PÚBLICOS (preparado em 23/09/2026)
+===================================================================
+
+RESUMO: só o NTHU-DDD precisa de e-mail. Os outros dois são abertos.
+
+1) YawDD (bocejo, carro real, ~5,3 GB)
+   - Aberto. Criar conta gratuita no IEEE DataPort (não precisa ser membro IEEE)
+     e baixar: https://ieee-dataport.org/open-access/yawdd-yawning-detection-dataset
+   - Baixar também o "Participants Information" (328 KB): diz de quais vídeos
+     pode mostrar imagem em publicação. Nos demais, PROIBIDO mostrar o rosto.
+   - Citar: Abtahi, Omidyeganeh, Shirmohammadi, Hariri. "YawDD: A Yawning
+     Detection Dataset". ACM MMSys 2014. DOI 10.1145/2557642.2563678
+
+2) UTA-RLDD (60 pessoas, alerta / pouco vigilante / com sono, 111 GB!)
+   - Aberto, direto no Google Drive (site oficial):
+     https://sites.google.com/view/utarldd/home
+   - 111 GB é grande demais pro cartão do Pi. Baixar só alguns participantes
+     (cada um tem 3 vídeos de ~10 min). Pra testar, uns 10 participantes bastam.
+   - Citar: Ghoddoosian, Galib, Athitsos. "A Realistic Dataset and Baseline
+     Temporal Model for Early Drowsiness Detection". CVPR Workshops 2019.
+     arXiv:1904.07312
+
+3) NTHU-DDD (36 pessoas, dia/noite infravermelho, com óculos e óculos ESCUROS)
+   - Precisa de pedido por e-mail + termo assinado (NTHU-DDD-LicenseAgreement.pdf,
+     nesta pasta).
+   - O TERMO TEM QUE SER ASSINADO PELO CHEFE DO DEPARTAMENTO OU DIRETOR DO
+     LABORATÓRIO ("Title" = cargo dele). Ou seja: o Prof. Fábio assina, não vocês.
+   - Assunto obrigatório: "Dataset on Driver Drowsiness Detection from Video"
+   - Para: cvlablai636@my.nthu.edu.tw
+   - Aviso: há relatos de gente que esperou meses sem resposta. Mandar logo e
+     não depender dele pro Cap. 4. YawDD + UTA-RLDD já sustentam a avaliação.
+   - NÃO usar cópias não oficiais do Kaggle/Roboflow: violaria a licença
+     ("cannot be distributed to second parties") e a banca pode perguntar.
+   - Citar: Weng, Lai, Lai. "Driver Drowsiness Detection via a Hierarchical
+     Temporal Deep Belief Network". ACCV Workshops 2016.
+
+
+-------------------------------------------------------------------
+PASSO A: e-mail pro Prof. Fábio pedindo a assinatura
+-------------------------------------------------------------------
+Assunto: TCC sonolência: assinatura em termo de uso de dataset (NTHU-DDD)
+
+Professor Fábio, boa tarde.
+
+Para a avaliação do nosso TCC (detecção de sonolência no Raspberry Pi 5),
+queremos testar o sistema em uma base pública de vídeos de motoristas, a
+NTHU-DDD, da National Tsing Hua University (Taiwan). Ela tem 36 pessoas
+gravadas de dia e de noite, com e sem óculos, e permitiria medir a precisão
+do sistema em muito mais gente do que só nós dois.
+
+O acesso é gratuito, mas o termo de uso (em anexo, 1 página) precisa ser
+assinado pelo chefe do departamento ou pelo diretor do laboratório. Os
+termos são: uso só acadêmico e não comercial, não redistribuir os vídeos,
+não publicar imagens dos rostos e citar o artigo original. Não vamos treinar
+nenhum modelo com os vídeos, só rodar o sistema neles e comparar com as
+marcações da base.
+
+O senhor poderia assinar, ou nos indicar quem seria a pessoa certa na
+instituição? Nos campos, seriam preenchidos o nome, o e-mail, o endereço e o
+cargo de quem assina, além de "Centro Universitário de Brasília (UniCEUB)"
+em Institution.
+
+Obrigado,
+Antonio Eduardo dos Santos Saraiva e Lucas Baliza Barreto
+Engenharia da Computação, UniCEUB
+
+(anexar: NTHU-DDD-LicenseAgreement.pdf)
+
+
+-------------------------------------------------------------------
+PASSO B: e-mail pro NTHU (depois do termo assinado e escaneado)
+-------------------------------------------------------------------
+Para:    cvlablai636@my.nthu.edu.tw
+Cc:      e-mail do Prof. Fábio
+Assunto: Dataset on Driver Drowsiness Detection from Video
+
+Dear NTHU Computer Vision Lab,
+
+We are undergraduate Computer Engineering students at Centro Universitario
+de Brasilia (UniCEUB), Brazil, working on our final thesis under the
+supervision of Prof. Fabio de Oliveira Guimaraes (in copy).
+
+Our project is an embedded driver drowsiness detection system running
+entirely on a Raspberry Pi 5, using facial landmarks (eye aspect ratio,
+PERCLOS, yawning and head pose). We would like to use the NTHU-DDD dataset
+to evaluate our system on a larger and more diverse group of subjects,
+especially the Sunglasses and Night (IR) scenarios, which we cannot
+reproduce with our own equipment.
+
+The dataset will be used only for non-commercial academic evaluation. We
+will not redistribute it, will not publish any face images (except, if
+needed, subjects 010 and 021 as the agreement allows), and will cite Weng,
+Lai and Lai (ACCV Workshops 2016) in our thesis.
+
+Please find attached the End User License Agreement, signed by our
+supervisor.
+
+Thank you very much for making this dataset available.
+
+Best regards,
+Antonio Eduardo dos Santos Saraiva
+Lucas Baliza Barreto
+Computer Engineering, Centro Universitario de Brasilia (UniCEUB)
+Brasilia, Brazil
+
+(anexar: o termo assinado, em PDF)
+
+--- Tradução do e-mail B, pra vocês saberem o que estão mandando ---
+Somos alunos de graduação em Engenharia da Computação do UniCEUB, fazendo o
+TCC sob orientação do Prof. Fábio (em cópia). O projeto é um sistema
+embarcado de detecção de sonolência rodando só no Raspberry Pi 5, com
+landmarks faciais (EAR, PERCLOS, bocejo e pose da cabeça). Queremos usar a
+NTHU-DDD pra avaliar o sistema em um grupo maior e mais variado de pessoas,
+principalmente nos cenários de óculos escuros e noite (infravermelho), que
+não conseguimos reproduzir com nosso equipamento. Uso só acadêmico e não
+comercial, sem redistribuir, sem publicar rostos (exceto, se preciso, os
+sujeitos 010 e 021, como o termo permite), citando o artigo original. Em
+anexo, o termo assinado pelo orientador. Obrigado por disponibilizarem a base.

@@ -233,3 +233,5 @@ Testes automatizados: 16 de 16 passando.
   paginas, contra 39 pares de parenteses).
 * Ordem dos autores esta como voce informou. Alguns cursos exigem ordem
   alfabetica: confirmar com a coordenacao.
+
+[23/09/2026] DATASETS PÚBLICOS: YawDD e UTA-RLDD são abertos (só baixar). NTHU-DDD precisa de termo assinado pelo orientador + e-mail. Tudo em monografia/datasets/PEDIDOS_DATASETS.txt (cópia na Área de Trabalho, pasta "TCC - Pedidos datasets").
