@@ -130,7 +130,11 @@ def _extrair(path, destino):
                            nan if pf["abertura_boca_ext"] is None else pf["abertura_boca_ext"],
                            # 9: nariz-queixo; 10 em diante: blendshapes, na ordem de core.BLENDSHAPES_USADOS
                            nan if pf["queixo"] is None else pf["queixo"],
-                           *(pf["blendshapes"].get(n, nan) for n in core.BLENDSHAPES_USADOS)))
+                           *(pf["blendshapes"].get(n, nan) for n in core.BLENDSHAPES_USADOS),
+                           # 24 a 28, em estudo (rosto de lado e óculos): EAR esq/dir e MAR
+                           # em 3D, ângulo do rosto (graus) e razão de brilho olho/rosto
+                           *(nan if pf[k] is None else pf[k] for k in ("left_ear3d", "right_ear3d", "mar3d", "yaw")),
+                           nan if not (pf["eye_bright"] and pf["face_bright"]) else pf["eye_bright"] / pf["face_bright"]))
     finally:
         landmarker.close()
         source.close()
@@ -143,11 +147,15 @@ def _v(x):
     return None if x != x else x   # nan -> None
 
 
-def simular(serie):
+def simular(serie, eventos=None):
     """Fase rápida: refaz calibração e detecção a partir das medidas salvas,
     com a mesma lógica do programa ao vivo (core.calibrar_quadros e
     eye_fatigue.build_state). Como só usa o core, qualquer ajuste de limiar
-    ou regra pode ser reavaliado nos 349 vídeos em segundos."""
+    ou regra pode ser reavaliado nos 349 vídeos em segundos.
+
+    eventos: lista opcional que recebe (t, tipo) de cada alarme, aviso,
+    bocejo, piscada longa e queda de cabeça, pra avaliar por trecho de vídeo
+    (ver avaliar_angulos.py)."""
     import contextlib, io
     import numpy as np
     import core
@@ -180,6 +188,8 @@ def simular(serie):
         state = ef.build_state(ear_b, mar_b, pitch_b, core.sorriso_neutro(quadros))
     for t_b in bocejos_calib:
         state.registrar_bocejo(t_b)
+        if eventos is not None:
+            eventos.append((t_b, "bocejo"))
 
     frames = com_rosto = alarmes = avisos = bocejos = piscadas = quedas = 0
     t_ultimo_aviso = t_bocejo = None
@@ -195,12 +205,16 @@ def simular(serie):
             mar_max = max(mar_max, st["mar"])
         fechado = st["level"] == "fechado"
         alarmes += fechado and not prev["fechado"]
+        if eventos is not None and fechado and not prev["fechado"]:
+            eventos.append((t, "alarme"))
         # aviso contado como o programa toca: o sinal oscila, mas o som só
         # repete depois de ATTENTION_REPEAT_SECONDS (ver AlertPlayer)
         atencao = st["atencao_by_blinks"] or st["atencao_by_head"] or st["atencao_by_perclos"]
         if atencao and (t_ultimo_aviso is None or t - t_ultimo_aviso >= ef.ATTENTION_REPEAT_SECONDS):
             avisos += 1
             t_ultimo_aviso = t
+            if eventos is not None:
+                eventos.append((t, "aviso"))
         # contagens das janelas deslizantes: soma só os aumentos (evento novo)
         if st["yawn_count_recent"] > prev["bocejos"]:
             bocejos += st["yawn_count_recent"] - prev["bocejos"]
@@ -208,6 +222,11 @@ def simular(serie):
                 t_bocejo = t
         piscadas += max(0, st["blink_count_recent"] - prev["piscadas"])
         quedas += max(0, st["head_down_count_recent"] - prev["cabeca"])
+        if eventos is not None:
+            for tipo, chave, atual in (("bocejo", "bocejos", st["yawn_count_recent"]),
+                                       ("piscada_longa", "piscadas", st["blink_count_recent"]),
+                                       ("queda_cabeca", "cabeca", st["head_down_count_recent"])):
+                eventos.extend([(t, tipo)] * max(0, atual - prev[chave]))
         prev = {"fechado": fechado, "bocejos": st["yawn_count_recent"],
                 "piscadas": st["blink_count_recent"], "cabeca": st["head_down_count_recent"]}
 

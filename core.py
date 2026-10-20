@@ -275,6 +275,38 @@ def mouth_aspect_ratio(landmarks, mouth_idx, w, h):
     return _aspect_ratio(landmarks, mouth_idx, w, h)
 
 
+def _ponto3d(lm, w, h):
+    # o MediaPipe dá a profundidade z na mesma escala do x (fração da largura)
+    return np.array((lm.x * w, lm.y * h, getattr(lm, "z", 0.0) * w))
+
+
+def aspect_ratio_3d(landmarks, idx, w, h):
+    """Mesma razão de 6 pontos do EAR/MAR, mas com distâncias em 3D. Em 2D,
+    com o rosto visto de lado (câmera fora do eixo ou cabeça virada), a
+    largura do olho/boca encolhe na imagem pelo cosseno do ângulo e a razão
+    sobe: a 45° o MAR de quem só fala sobe ~40%. Com a profundidade do
+    MediaPipe a largura volta ao tamanho real. EM ESTUDO: gravada nas séries
+    do YawDD, ainda fora da decisão."""
+    p1, p2, p3, p4, p5, p6 = (_ponto3d(landmarks[i], w, h) for i in idx)
+    horizontal = np.linalg.norm(p1 - p4)
+    if horizontal < 1e-3:
+        return None
+    return float((np.linalg.norm(p2 - p6) + np.linalg.norm(p3 - p5)) / (2.0 * horizontal))
+
+
+def head_yaw_deg(landmarks, w, h):
+    """Quanto o rosto está virado de lado, em graus (0 = de frente pra
+    câmera; o sinal diz o lado). Ângulo da linha entre os cantos externos
+    dos olhos no plano horizontal (x, z): de frente ela é paralela à imagem,
+    virando ela ganha profundidade. EM ESTUDO."""
+    a = _ponto3d(landmarks[EYE_CORNERS_OUTER[0]], w, h)
+    b = _ponto3d(landmarks[EYE_CORNERS_OUTER[1]], w, h)
+    dx, dz = b[0] - a[0], b[2] - a[2]
+    if abs(dx) < 1e-3 and abs(dz) < 1e-3:
+        return None
+    return float(np.degrees(np.arctan2(dz, dx)))
+
+
 INNER_LIPS = (13, 14)        # meio do lábio de cima / de baixo, por dentro
 OUTER_LIPS = (0, 17)         # idem, por fora (pega a boca aberta atrás da mão?)
 EYE_CORNERS_OUTER = (33, 263)  # cantos externos dos olhos: régua do tamanho do rosto

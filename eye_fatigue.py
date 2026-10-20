@@ -393,6 +393,7 @@ def process_frame(landmarker, timestamp, MpImage, MpImageFormat, infer_frame, iw
 
     left_ear = right_ear = mar = head_pitch = eyes_dark = None
     eye_bright = face_bright = abertura_boca = abertura_boca_ext = queixo = None
+    left_ear3d = right_ear3d = mar3d = yaw = None   # em estudo (rosto de lado)
     idx = core.select_driver_index(result.face_landmarks)
     landmarks = result.face_landmarks[idx] if idx is not None else None
     face_detected = landmarks is not None
@@ -404,6 +405,10 @@ def process_frame(landmarker, timestamp, MpImage, MpImageFormat, infer_frame, iw
         abertura_boca_ext = core.mouth_opening_ratio(landmarks, iw, ih, core.OUTER_LIPS)
         queixo = core.jaw_drop_ratio(landmarks, iw, ih)
         head_pitch = core.head_drop_ratio(landmarks, iw, ih)
+        left_ear3d = core.aspect_ratio_3d(landmarks, core.LEFT_EYE, iw, ih)
+        right_ear3d = core.aspect_ratio_3d(landmarks, core.RIGHT_EYE, iw, ih)
+        mar3d = core.aspect_ratio_3d(landmarks, core.MOUTH, iw, ih)
+        yaw = core.head_yaw_deg(landmarks, iw, ih)
         eye_bright, face_bright = core.eye_region_darkness(infer_frame, landmarks, iw, ih)
         if eye_bright is not None and face_bright is not None and face_bright > core.DARK_EYES_MIN_FACE_BRIGHTNESS:
             eyes_dark = eye_bright < face_bright * core.DARK_EYES_BRIGHTNESS_RATIO
@@ -415,6 +420,7 @@ def process_frame(landmarker, timestamp, MpImage, MpImageFormat, infer_frame, iw
         "face_detected": face_detected, "landmarks": landmarks,
         "abertura_boca": abertura_boca, "abertura_boca_ext": abertura_boca_ext,
         "queixo": queixo, "blendshapes": core.blendshapes_do_rosto(result, idx),
+        "left_ear3d": left_ear3d, "right_ear3d": right_ear3d, "mar3d": mar3d, "yaw": yaw,
         "latency_ms": latency_ms,
     }
 

@@ -32,3 +32,6 @@ avaliacao_yawdd/
 
 # Saída do início automático (iniciar_no_boot.sh)
 logs/
+
+# Vídeos de teste do próprio motorista (gravar_angulos.py): rosto = dado biométrico
+videos_proprios/

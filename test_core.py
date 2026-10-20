@@ -537,3 +537,44 @@ def test_camera_mode_is_full_view_at_30_fps():
         ]
 
     assert core.pick_camera_mode(CameraFalsa())["size"] == (1296, 972)
+
+
+def _rosto_girado(graus, w=640, h=480):
+    """Olho, boca e cantos dos olhos num rosto de frente, girado em torno do
+    eixo vertical e projetado na imagem (x, y normalizados; z na escala de x)."""
+    import math
+    pts = [SimpleNamespace(x=0.5, y=0.5, z=0.0) for _ in range(478)]
+    olho = [(-15, 0), (-5, -5), (5, -5), (15, 0), (5, 5), (-5, 5)]   # EAR 0,333
+    boca = [(-25, 0), (-8, -6), (8, -6), (25, 0), (8, 6), (-8, 6)]   # MAR 0,24
+    c, s = math.cos(math.radians(graus)), math.sin(math.radians(graus))
+
+    def poe(i, x, y, cx=0.0, cy=0.0):
+        x, z = (cx + x) * c, (cx + x) * s
+        pts[i] = SimpleNamespace(x=0.5 + x / w, y=0.5 + (cy + y) / h, z=z / w)
+
+    for i, (x, y) in zip(core.LEFT_EYE, olho):
+        poe(i, x, y, cx=35, cy=-30)
+    for i, (x, y) in zip(core.RIGHT_EYE, olho):
+        poe(i, x, y, cx=-35, cy=-30)
+    for i, (x, y) in zip(core.MOUTH, boca):
+        poe(i, x, y, cy=40)
+    poe(core.EYE_CORNERS_OUTER[0], -50, -30)
+    poe(core.EYE_CORNERS_OUTER[1], 50, -30)
+    return pts
+
+
+def test_3d_ratios_do_not_inflate_when_the_face_is_seen_from_the_side():
+    de_frente, de_lado = _rosto_girado(0), _rosto_girado(45)
+    ear2d = core.eye_aspect_ratio(de_lado, core.LEFT_EYE, 640, 480)
+    mar2d = core.mouth_aspect_ratio(de_lado, core.MOUTH, 640, 480)
+    # em 2D a largura encolhe pelo cosseno de 45° e a razão sobe ~41%
+    assert ear2d == pytest.approx(core.eye_aspect_ratio(de_frente, core.LEFT_EYE, 640, 480) * 2 ** 0.5, rel=0.01)
+    assert mar2d == pytest.approx(core.mouth_aspect_ratio(de_frente, core.MOUTH, 640, 480) * 2 ** 0.5, rel=0.01)
+    # em 3D fica igual à de frente
+    assert core.aspect_ratio_3d(de_lado, core.LEFT_EYE, 640, 480) == pytest.approx(1 / 3, rel=0.01)
+    assert core.aspect_ratio_3d(de_lado, core.MOUTH, 640, 480) == pytest.approx(0.24, rel=0.01)
+
+
+def test_head_yaw_follows_the_rotation():
+    for graus in (0, 30, 45, -45):
+        assert core.head_yaw_deg(_rosto_girado(graus), 640, 480) == pytest.approx(graus, abs=0.5)
