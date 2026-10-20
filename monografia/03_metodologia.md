@@ -4,9 +4,11 @@ Este trabalho caracteriza-se como pesquisa aplicada, com desenvolvimento de um p
 
 ## 3.1 Hardware e software
 
-O protótipo é formado por um Raspberry Pi 5 com 4 GB de memória, um módulo de câmera com sensor OmniVision OV5647 de 5 megapixels conectado à interface MIPI, um fone de ouvido Bluetooth (Lenovo ThinkPlus GM2 Pro) para os alertas sonoros, uma tela sensível ao toque ligada ao barramento SPI e um *buzzer* ativo, ligado ao pino GPIO26, que serve de alarme de reserva. A Figura 1 apresenta a arquitetura do sistema.
+O protótipo é formado por um Raspberry Pi 5 com 4 GB de memória, um módulo de câmera com sensor OmniVision OV5647 de 5 megapixels conectado à interface MIPI, um fone de ouvido Bluetooth (Lenovo ThinkPlus GM2 Pro) para os alertas sonoros, uma tela sensível ao toque ligada ao barramento SPI e um *buzzer* ativo, ligado ao pino GPIO26, que serve de alarme de reserva. A Figura 1 apresenta a arquitetura do sistema, com as etapas numeradas na ordem em que cada quadro as percorre.
 
-::: Figura 1: arquitetura do sistema (diagrama de blocos a inserir)
+::: Figura 1: arquitetura do sistema
+
+![Figura 1: arquitetura do sistema](figuras/figura1_arquitetura.svg)
 
 ::: Fonte: autoria própria
 
@@ -126,6 +128,6 @@ Por fim, o desempenho na plataforma-alvo foi medido por uma ferramenta própria,
 - **Tamanho:** cerca de 3.000 palavras de texto e três quadros, contra 1.790 palavras e sete figuras no Cap. 3 do TCC-modelo. Dá para enxugar se o orientador achar longo; o mais fácil de cortar é o detalhamento das condições adversas (Seção 3.4, último parágrafo).
 - **Sem referências novas:** este capítulo só cita referências já listadas (9, 14, 15, 19 e 21).
 - **Conferido no código em 20/10/2026** (`core.py`, `eye_fatigue.py`, `gerar_vozes.py`, `avaliar_yawdd.py`, `validacao_cruzada.py`, `benchmark.py`): todos os números do texto e dos quadros. Se algum limiar mudar no código, o Quadro 1 e a Seção 3.4 precisam mudar junto.
-- **Figura 1 (a fazer):** diagrama de blocos câmera → MediaPipe → medidas → suavização → máquina de estados → alertas/registro, com o Pi 5 em volta. Outras figuras úteis: foto da montagem no carro, captura da tela com os pontos no rosto (rosto do autor, com autorização dele) e o gráfico do EAR numa piscada longa.
+- **Figura 1:** diagrama de blocos em `figuras/figura1_arquitetura.svg` (vetorial, embutido no HTML e no PDF; para colar no Google Docs há uma cópia em PNG na Área de Trabalho, "TCC - Figura 1.png"). Outras figuras úteis: foto da montagem no carro, captura da tela com os pontos no rosto (rosto do autor, com autorização dele) e o gráfico do EAR numa piscada longa.
 - **A confirmar com os autores:** modelo exato do fone (Lenovo ThinkPlus GM2 Pro) e tamanho da tela SPI.
 - **Ainda não usado aqui:** `core.realcar_pouca_luz` (realce de contraste com pouca luz) existe no código mas não está ligado no processamento; fica para trabalhos futuros no Cap. 5.

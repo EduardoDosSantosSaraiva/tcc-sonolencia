@@ -68,6 +68,8 @@ CSS = """
  p.eq .num{position:absolute;right:0}
  table{border-collapse:collapse;width:100%;font-size:10pt;line-height:1.1;margin:0;page-break-inside:avoid}
  .quadro{page-break-inside:avoid}
+ .figura{text-align:center;margin:0}
+ .figura svg,.figura img{width:100%;height:auto}
  th,td{border:1px solid #000;padding:3pt 4pt;text-align:left;vertical-align:top}
 """
 
@@ -203,8 +205,8 @@ def main():
         refs, textos = {}, []
         for nome in capitulos:
             miolo, novas = separar_referencias(corpo(AQUI / nome))
-            # título, quadro e fonte sempre na mesma página
-            miolo = re.sub(r'(<p class="legenda">Quadro .*?</table>\s*<p class="legenda">Fonte[^<]*</p>)',
+            # título, quadro (ou figura) e fonte sempre na mesma página
+            miolo = re.sub(r'(<p class="legenda">(?:Quadro|Figura) .*?(?:</table>|</svg></div>)\s*<p class="legenda">Fonte[^<]*</p>)',
                            r'<div class="quadro">\1</div>', miolo, flags=re.S)
             for n in sorted(novas.keys() & refs.keys()):
                 if novas[n] != refs[n]:

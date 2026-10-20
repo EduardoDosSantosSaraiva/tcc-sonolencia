@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 708 326" font-family="'Liberation Sans', Arial, Helvetica, sans-serif" font-size="12" fill="#000">
+  <defs>
+    <marker id="seta" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#000"/>
+    </marker>
+  </defs>
+
+  <!-- Raspberry Pi 5: tudo que está dentro roda no próprio dispositivo -->
+  <rect x="142" y="10" width="560" height="306" rx="8" fill="#f2f2f2" stroke="#000" stroke-width="1.2" stroke-dasharray="6 4"/>
+  <text x="154" y="30" font-style="italic">Raspberry Pi 5: todo o processamento é local</text>
+
+  <g stroke="#000" stroke-width="1.2" fill="#fff">
+    <!-- dispositivos externos -->
+    <rect x="4" y="42" width="106" height="70" rx="3"/>
+    <rect x="4" y="146" width="106" height="42" rx="3"/>
+    <rect x="4" y="204" width="106" height="42" rx="3"/>
+    <rect x="4" y="262" width="106" height="42" rx="3"/>
+    <!-- etapas por quadro -->
+    <rect x="152" y="42" width="160" height="70" rx="3"/>
+    <rect x="336" y="42" width="160" height="70" rx="3"/>
+    <rect x="520" y="42" width="160" height="70" rx="3"/>
+    <rect x="520" y="146" width="160" height="70" rx="3"/>
+    <rect x="336" y="146" width="160" height="70" rx="3"/>
+    <rect x="152" y="146" width="160" height="70" rx="3"/>
+    <!-- apoio -->
+    <rect x="520" y="250" width="160" height="54" rx="3"/>
+    <rect x="152" y="250" width="160" height="54" rx="3"/>
+  </g>
+
+  <g text-anchor="middle">
+    <text x="57" y="68" font-weight="bold" font-size="13">Câmera</text>
+    <text x="57" y="86">OV5647</text>
+    <text x="57" y="102">MIPI CSI</text>
+    <text x="57" y="164" font-weight="bold" font-size="13">Fone</text>
+    <text x="57" y="180">Bluetooth</text>
+    <text x="57" y="222" font-weight="bold" font-size="13">Buzzer</text>
+    <text x="57" y="238">(reserva)</text>
+    <text x="57" y="280" font-weight="bold" font-size="13">Tela</text>
+    <text x="57" y="296">SPI</text>
+
+    <text x="232" y="66" font-weight="bold" font-size="13">1. Captura</text>
+    <text x="232" y="84">Picamera2,</text>
+    <text x="232" y="100">640 × 480 pixels</text>
+
+    <text x="416" y="66" font-weight="bold" font-size="13">2. Face Landmarker</text>
+    <text x="416" y="84">MediaPipe: 478 pontos</text>
+    <text x="416" y="100">e 52 blendshapes</text>
+
+    <text x="600" y="66" font-weight="bold" font-size="13">3. Medidas</text>
+    <text x="600" y="84">EAR, MAR, jawOpen,</text>
+    <text x="600" y="100">sorriso, H e brilho</text>
+
+    <text x="600" y="170" font-weight="bold" font-size="13">4. Suavização</text>
+    <text x="600" y="188">mediana de 3 quadros</text>
+    <text x="600" y="204">(olhos) ou 9 (boca)</text>
+
+    <text x="416" y="170" font-weight="bold" font-size="13">5. Regras de decisão</text>
+    <text x="416" y="188">máquina de estados,</text>
+    <text x="416" y="204">níveis de alerta</text>
+
+    <text x="232" y="170" font-weight="bold" font-size="13">6. Alertas</text>
+    <text x="232" y="188">voz, sirene e</text>
+    <text x="232" y="204">estado na tela</text>
+
+    <text x="600" y="272" font-weight="bold" font-size="13">Calibração individual</text>
+    <text x="600" y="290">5 s em repouso, ao ligar</text>
+
+    <text x="232" y="272" font-weight="bold" font-size="13">Registro local</text>
+    <text x="232" y="290">SQLite, só números</text>
+
+    <text x="480" y="270" font-size="11.5">limiares</text>
+  </g>
+
+  <g stroke="#000" stroke-width="1.4" fill="none">
+    <!-- fluxo de cada quadro -->
+    <path d="M110,77 H152" marker-end="url(#seta)"/>
+    <path d="M312,77 H336" marker-end="url(#seta)"/>
+    <path d="M496,77 H520" marker-end="url(#seta)"/>
+    <path d="M600,112 V146" marker-end="url(#seta)"/>
+    <path d="M520,181 H496" marker-end="url(#seta)"/>
+    <path d="M336,181 H312" marker-end="url(#seta)"/>
+    <!-- saídas: fone, buzzer e tela -->
+    <path d="M152,181 H126"/>
+    <path d="M126,167 V283"/>
+    <path d="M126,167 H110" marker-end="url(#seta)"/>
+    <path d="M126,225 H110" marker-end="url(#seta)"/>
+    <path d="M126,283 H110" marker-end="url(#seta)"/>
+    <!-- calibração: recebe as medidas ao ligar e devolve os limiares -->
+    <path d="M680,77 H692 V277 H680" marker-end="url(#seta)"/>
+    <path d="M520,277 H440 V216" marker-end="url(#seta)"/>
+    <!-- registro -->
+    <path d="M378,216 V277 H312" marker-end="url(#seta)"/>
+  </g>
+</svg>

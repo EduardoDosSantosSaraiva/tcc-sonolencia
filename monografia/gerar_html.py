@@ -52,6 +52,8 @@ CSS = """
  p.eq .num{position:absolute;right:0}
  table{border-collapse:collapse;width:100%;font-size:10pt;line-height:1.1;margin:0;page-break-inside:avoid}
  th,td{border:1px solid #000;padding:3pt 4pt;text-align:left;vertical-align:top}
+ .figura{text-align:center;margin:0}
+ .figura svg,.figura img{width:100%;height:auto}
  @media print{body{margin:0;max-width:none}}
 """
 
@@ -116,6 +118,18 @@ def converter(caminho_md):
         if linha.startswith("::: "):
             fecha_lista()
             linhas.append('<p class="legenda">' + inline(linha[4:]) + "</p>")
+            continue
+        # figura: "![texto](figuras/arquivo.svg)". O SVG vai embutido no HTML,
+        # pra o PDF (montado numa pasta temporária) não perder o caminho
+        figura = re.fullmatch(r"!\[(.*?)\]\((.+?)\)", linha.strip())
+        if figura:
+            fecha_lista()
+            arquivo = (origem.parent / figura.group(2)).resolve()
+            if arquivo.suffix.lower() == ".svg":
+                conteudo = re.sub(r"<\?xml.*?\?>", "", arquivo.read_text()).strip()
+            else:
+                conteudo = f'<img src="{arquivo.as_uri()}" alt="{html.escape(figura.group(1))}">'
+            linhas.append(f'<div class="figura">{conteudo}</div>')
             continue
         # equação centralizada com o número à direita: "$$ fórmula | (1)"
         if linha.startswith("$$ "):
