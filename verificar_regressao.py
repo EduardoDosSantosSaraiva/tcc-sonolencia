@@ -51,7 +51,8 @@ PIOR_SE_SOBE = {"bocejos_falsos", "alarmes_falsos", "avisos_falsos"}
 
 def escolher_series():
     """Pra cada vídeo, a série mais completa (mais colunas) e, no empate, a
-    mais nova. As rodadas antigas não têm mandíbula nem sorriso."""
+    mais nova. As rodadas antigas não têm mandíbula nem sorriso. Retorna
+    {arquivo: (linha do resultados.csv, série, caminho do .npz)}."""
     escolhidas = {}
     for csv_path in sorted(PASTA_YAWDD.glob("*/resultados.csv")):
         for r in csv.DictReader(open(csv_path)):
@@ -61,15 +62,15 @@ def escolher_series():
             serie = np.load(npz)["serie"]
             chave = (serie.shape[1], csv_path.parent.name)
             if r["arquivo"] not in escolhidas or chave > escolhidas[r["arquivo"]][0]:
-                escolhidas[r["arquivo"]] = (chave, r, serie)
-    return {a: (r, s) for a, (_k, r, s) in escolhidas.items()}
+                escolhidas[r["arquivo"]] = (chave, r, serie, npz)
+    return {a: (r, s, npz) for a, (_k, r, s, npz) in escolhidas.items()}
 
 
 def medir_yawdd():
     series = escolher_series()
     por_video = {}
     vp = fn = falsos = dash = alarmes = avisos = 0
-    for arq, (r, serie) in sorted(series.items()):
+    for arq, (r, serie, _npz) in sorted(series.items()):
         sim = simular(serie)
         b, al, av = int(sim["bocejos"]), int(sim["alarmes_fechado"]), int(sim["avisos_atencao"])
         nome = str(Path(arq).relative_to(Path(arq).parents[2]))
