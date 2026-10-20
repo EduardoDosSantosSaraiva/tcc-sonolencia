@@ -67,7 +67,7 @@ CSS = """
  p.eq{text-indent:0;text-align:center;position:relative;margin:6pt 0 12pt}
  p.eq .num{position:absolute;right:0}
  table{border-collapse:collapse;width:100%;font-size:10pt;line-height:1.1;margin:0;page-break-inside:avoid}
- table+p.legenda{page-break-before:avoid}
+ .quadro{page-break-inside:avoid}
  th,td{border:1px solid #000;padding:3pt 4pt;text-align:left;vertical-align:top}
 """
 
@@ -203,6 +203,9 @@ def main():
         refs, textos = {}, []
         for nome in capitulos:
             miolo, novas = separar_referencias(corpo(AQUI / nome))
+            # título, quadro e fonte sempre na mesma página
+            miolo = re.sub(r'(<p class="legenda">Quadro .*?</table>\s*<p class="legenda">Fonte[^<]*</p>)',
+                           r'<div class="quadro">\1</div>', miolo, flags=re.S)
             for n in sorted(novas.keys() & refs.keys()):
                 if novas[n] != refs[n]:
                     print(f"  Aviso: a referência {n} aparece diferente em {nome}.")
