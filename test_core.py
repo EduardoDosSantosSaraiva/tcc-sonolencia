@@ -522,3 +522,18 @@ def test_closed_eyes_while_yawning_do_not_raise_perclos():
     while t < 10.0:
         st = state.update(0.05, 0.05, 0.02, None, None, True, t); t += 0.1
     assert st["perclos"] > 0.0
+
+
+def test_camera_mode_is_full_view_at_30_fps():
+    # modos reais da OV5647 (rpicam-hello --list-cameras): a resolução máxima
+    # só dá 15,6 fps e o 1920x1080 recorta o centro; o certo é 1296x972
+    class CameraFalsa:
+        sensor_resolution = (2592, 1944)
+        sensor_modes = [
+            {"size": (640, 480), "fps": 62.5, "crop_limits": (16, 0, 2560, 1920)},
+            {"size": (1296, 972), "fps": 46.34, "crop_limits": (0, 0, 2592, 1944)},
+            {"size": (1920, 1080), "fps": 32.81, "crop_limits": (348, 434, 1928, 1080)},
+            {"size": (2592, 1944), "fps": 15.63, "crop_limits": (0, 0, 2592, 1944)},
+        ]
+
+    assert core.pick_camera_mode(CameraFalsa())["size"] == (1296, 972)

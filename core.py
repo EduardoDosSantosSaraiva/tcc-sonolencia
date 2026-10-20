@@ -29,8 +29,9 @@ MOUTH = [61, 82, 312, 291, 317, 87]
 
 LORES_SIZE = (640, 480)     # resolução usada pela IA (fixo, independe do sensor,
                              # não afetado pela resolução escolhida pro "main")
-TARGET_FPS = 30              # só usado como fallback se o sensor_mode não informar
-                              # fps (não limita mais a escolha de resolução)
+TARGET_FPS = 30              # taxa da câmera ao vivo: a mesma dos vídeos do YawDD,
+                              # em que os limiares e as janelas (em quadros) foram
+                              # validados. Ver pick_camera_mode
 
 EAR_THRESHOLD_DEFAULT = 0.21       # usado se não houver calibração por pessoa
 EAR_ALMOST_CLOSED_DEFAULT = 0.26
@@ -179,7 +180,7 @@ MAR_SMOOTHING_WINDOW = 9      # boca bem aberta (bocejo) é mais instável pro t
                                # dos pontos internos do lábio do que o olho — testado
                                # ao vivo, MAR oscilou de 0.003 a 0.82 na mesma janela
                                # de 8s durante um bocejo real mesmo já com janela de 5;
-                               # subiu pra 9 (~0.6s a 15fps) pra aguentar uma lacuna de
+                               # subiu pra 9 (~0.6s a 15fps, ~0.3s a 30fps como no YawDD) pra aguentar uma lacuna de
                                # tracking maior sem perder o bocejo
 NO_FACE_GRACE_SECONDS = 0.5   # tolerância antes de considerar "sem rosto" de vez
                                # (tracking falha por 1-2 frames com frequência, mesmo
@@ -518,36 +519,60 @@ def select_driver_face(face_landmarks_list):
 # tempo "de conteúdo", não de quão rápido o Pi processa o arquivo.
 # ---------------------------------------------------------------------------
 
-def pick_max_mode(picam2):
-    """Maior resolução que o sensor conectado oferece, sem concessão de fps
-    — prioridade é o detalhe da imagem (gravação/prints da monografia), o
-    fps que o hardware entregar nessa resolução é o que for. Não fixamos no
-    hardware da OV5647 porque o plano do TCC prevê trocar pra uma câmera
-    NoIR mais pra frente; a lógica de "maior resolução do sensor" vale pra
-    qualquer sensor conectado."""
+def _campo_inteiro(mode, sensor_size):
+    """O modo enxerga (quase) o sensor inteiro, sem cortar as bordas? Modos
+    que recortam o centro (ex.: 1920x1080 da OV5647) estreitam o campo de
+    visão e podem deixar parte do rosto de fora com a câmera de lado."""
+    _x, _y, w, h = mode.get("crop_limits", (0, 0, *sensor_size))
+    return w >= 0.95 * sensor_size[0] and h >= 0.95 * sensor_size[1]
+
+
+def pick_camera_mode(picam2):
+    """Maior resolução que entrega TARGET_FPS (30) com o campo de visão
+    inteiro; sem nenhum assim, o modo mais rápido de campo inteiro.
+
+    Era a maior resolução do sensor sem olhar o fps: na OV5647 isso dava
+    2592x1944 a só 15,6 fps, metade da taxa dos vídeos do YawDD, em que os
+    limiares foram validados (as janelas de suavização contam quadros: 9
+    quadros eram 0,58 s ao vivo contra 0,3 s na avaliação). Na OV5647 a
+    escolha agora é 1296x972 (binning 2x2 do sensor inteiro, até 46 fps)
+    travado em 30. Vale pra qualquer sensor (o plano prevê trocar pra uma
+    câmera NoIR)."""
     modes = picam2.sensor_modes
-    return max(modes, key=lambda m: m["size"][0] * m["size"][1])
+    sensor_size = picam2.sensor_resolution
+    inteiros = [m for m in modes if _campo_inteiro(m, sensor_size)] or modes
+    rapidos = [m for m in inteiros if (m.get("fps") or 0) >= TARGET_FPS]
+    if rapidos:
+        return max(rapidos, key=lambda m: m["size"][0] * m["size"][1])
+    return max(inteiros, key=lambda m: m.get("fps") or 0)
 
 
 def _build_camera_config(picam2):
-    """Tenta a configuração ideal (main na resolução máxima do sensor +
-    lores em baixa resolução pra IA) e vai degradando se o hardware/driver
+    """Tenta a configuração ideal (main no modo escolhido do sensor + lores
+    em baixa resolução pra IA) e vai degradando se o hardware/driver
     recusar, em vez de travar o programa por causa de uma combinação não
     suportada."""
-    mode = pick_max_mode(picam2)
+    mode = pick_camera_mode(picam2)
     main_size = mode["size"]
-    # Trava no fps nativo do sensor nessa resolução (não um alvo artificial
-    # menor) — sem isso o Picamera2 às vezes negocia uma taxa mais baixa que
-    # o necessário. É o teto físico do sensor, não uma limitação nossa.
-    native_fps = mode.get("fps") or TARGET_FPS
-    frame_duration_us = int(1_000_000 / native_fps)
+    # Trava em TARGET_FPS (ou no máximo do modo, se ele não chegar lá): sem
+    # isso o Picamera2 às vezes negocia uma taxa mais baixa que o necessário
+    fps = min(TARGET_FPS, mode.get("fps") or TARGET_FPS)
+    frame_duration_us = int(1_000_000 / fps)
     controls = {"FrameDurationLimits": (frame_duration_us, frame_duration_us)}
+    # pede o modo do sensor explicitamente: só pelo tamanho da saída o
+    # Picamera2 poderia escolher um modo recortado
+    sensor = {"output_size": mode["size"], "bit_depth": mode.get("bit_depth", 10)}
 
     attempts = [
         lambda: picam2.create_video_configuration(
             main={"size": main_size, "format": "RGB888"},
             lores={"size": LORES_SIZE, "format": "RGB888"},
-            controls=controls,
+            sensor=sensor, controls=controls,
+        ),
+        lambda: picam2.create_video_configuration(
+            main={"size": main_size, "format": "RGB888"},
+            lores={"size": LORES_SIZE, "format": "YUV420"},
+            sensor=sensor, controls=controls,
         ),
         lambda: picam2.create_video_configuration(
             main={"size": main_size, "format": "RGB888"},
@@ -592,10 +617,15 @@ class PicameraSource:
 
         try:
             if self.has_lores:
-                infer = self.picam2.capture_array("lores")
+                # os dois fluxos do MESMO quadro: duas capture_array seguidas
+                # esperavam um quadro novo cada uma e jogavam metade fora
+                # (30 fps do sensor viravam ~14 no programa)
+                if self.want_display:
+                    (infer, disp), _meta = self.picam2.capture_arrays(["lores", "main"])
+                else:
+                    infer, disp = self.picam2.capture_array("lores"), None
                 if self.lores_format == "YUV420":
                     infer = cv2.cvtColor(infer, cv2.COLOR_YUV2RGB_I420)
-                disp = self.picam2.capture_array("main") if self.want_display else None
             else:
                 infer = self.picam2.capture_array("main")
                 disp = infer if self.want_display else None
