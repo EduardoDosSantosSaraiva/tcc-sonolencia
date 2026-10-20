@@ -9,7 +9,7 @@
 arvore() { for p in "$@"; do echo "$p"; arvore $(pgrep -P "$p"); done; }
 # só processos python rodando esses scripts (um shell que só cita o nome
 # deles na linha de comando não pode entrar, ou pausaria a si mesmo)
-pausados=$(arvore $(pgrep -f "bin/python[0-9.]* (avaliar_yawdd|validacao_cruzada|avaliar_angulos)\.py"))
+pausados=$(arvore $(pgrep -f "bin/python[0-9.]* (avaliar_yawdd|validacao_cruzada|avaliar_angulos|processar_uta)\.py"))
 if [ -n "$pausados" ]; then
     echo "Pausando as medições em segundo plano enquanto o teste roda..."
     kill -STOP $pausados 2>/dev/null

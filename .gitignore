@@ -35,3 +35,8 @@ logs/
 
 # Vídeos de teste do próprio motorista (gravar_angulos.py): rosto = dado biométrico
 videos_proprios/
+
+# UTA-RLDD: vídeos baixados (apagados após medir) e séries (não redistribuir)
+uta_rldd/videos/
+uta_rldd/series/
+uta_rldd/progresso.csv
