@@ -22,6 +22,18 @@ if pgrep -f "benchmark.py" >/dev/null; then
     read -r -p "Enter para rodar mesmo assim, Ctrl+C para cancelar... " _
 fi
 
+# o monitoramento aberto no boot (iniciar_no_boot.sh) segura a câmera
+monitor=$(pgrep -f "bin/python[0-9.]* eye_fatigue\.py")
+if [ -n "$monitor" ]; then
+    echo "O monitoramento está aberto e usando a câmera."
+    read -r -p "Enter para fechá-lo e começar o autoteste, Ctrl+C para cancelar... " _
+    kill -INT $monitor 2>/dev/null
+    for _ in $(seq 1 20); do
+        pgrep -f "bin/python[0-9.]* eye_fatigue\.py" >/dev/null || break
+        sleep 0.5
+    done
+fi
+
 ./venv/bin/python eye_fatigue.py --modo-teste --no-log "$@"
 status=$?
 if [ $status -ne 0 ]; then

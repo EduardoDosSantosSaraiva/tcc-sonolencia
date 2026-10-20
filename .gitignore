@@ -29,3 +29,6 @@ vozes/
 # Resultados da avaliação no YawDD: gerados por avaliar_yawdd.py a partir
 # dos vídeos do dataset (que não pode ser redistribuído)
 avaliacao_yawdd/
+
+# Saída do início automático (iniciar_no_boot.sh)
+logs/
