@@ -183,6 +183,8 @@ def benchmark_resistencia():
     """intervalos.csv do teste mais longo e mais recente (de preferência ~60 min)."""
     candidatos = []
     for arq in (PROJETO / "benchmark_resultados").glob("*/intervalos.csv"):
+        if (arq.parent / "NAO_USAR.txt").exists():   # medição contaminada
+            continue
         linhas = list(csv.DictReader(open(arq)))
         if linhas:
             candidatos.append((float(linhas[-1]["min"]) >= 50, arq.parent.name, arq, linhas))
