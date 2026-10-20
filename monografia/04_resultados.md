@@ -4,7 +4,7 @@ Este capítulo apresenta os resultados das quatro frentes de avaliação descrit
 
 ## 4.1 Testes automatizados e regressão
 
-Os 42 testes automatizados da lógica de decisão foram aprovados na versão final do sistema. Cada um deles corresponde a um comportamento verificado ao longo do desenvolvimento, muitas vezes a partir de uma falha real: o bocejo com os olhos fechados que não pode disparar o alarme de sono, a queda da cabeça que tira o rosto do quadro e ainda assim deve ser contada, a fala e o sorriso que estendem o tempo do alarme. O teste de regressão, executado sobre as séries da rodada final do YawDD e sobre os 80 episódios de alarme registrados nas sessões ao vivo, [[PENDENTE: resultado do verificar_regressao.py da fila]].
+Os 42 testes automatizados da lógica de decisão foram aprovados na versão final do sistema. Cada um deles corresponde a um comportamento verificado ao longo do desenvolvimento, muitas vezes a partir de uma falha real: o bocejo com os olhos fechados que não pode disparar o alarme de sono, a queda da cabeça que tira o rosto do quadro e ainda assim deve ser contada, a fala e o sorriso que estendem o tempo do alarme. O teste de regressão, executado sobre as séries da rodada final do YawDD e sobre os 80 episódios de alarme registrados nas sessões ao vivo, não apontou piora em nenhum indicador em relação à referência de 30 de setembro. Apenas dois vídeos tiveram contagens alteradas, ambos com bocejos a mais em vídeos que já continham bocejo, efeito do reprocessamento das medidas desde o início. Dos 80 episódios ao vivo, 61 continuam disparando o alarme com as regras atuais, o mesmo número da referência. Como esses episódios foram gravados por versões anteriores do sistema, que tinham falhas corrigidas depois, o teste não exige que todos disparem, e sim que nenhuma mudança reduza esse número sem que se saiba por quê.
 
 ## 4.2 Protocolo de testes guiados
 
@@ -26,23 +26,23 @@ Na rodada final, de 20 de outubro de 2026, os oito cenários foram aprovados. A 
 
 ## 4.3 Avaliação na base YawDD
 
-A rodada final processou os 349 vídeos da base, com [[PENDENTE: calibração válida em X de 349 e rosto detectado em Y% dos quadros]]. O Quadro 4 compara os resultados da versão inicial do sistema, avaliada em 26 de setembro, com os da versão final.
+A rodada final processou os 349 vídeos da base, com calibração válida dos olhos em 348 deles e rosto detectado, em média, em 99,1% dos quadros de cada vídeo. O Quadro 4 compara os resultados da versão inicial do sistema, avaliada em 26 de setembro, com os da versão final.
 
 ::: Quadro 4: resultados na base YawDD, versão inicial e versão final
 
 | Medida | Versão inicial (26/09) | Versão final |
 |---|---|---|
-| Sensibilidade do bocejo (Mirror) | 46,1% (53 de 115) | [[ ]] |
-| Precisão do bocejo (Mirror) | 100,0% | [[ ]] |
-| Medida F1 do bocejo (Mirror) | 63,1% | [[ ]] |
-| Bocejo falso em vídeos de fala ou de condução normal | 0 de 205 | [[ ]] |
-| Vídeos do Dash com bocejo encontrado | 15 de 29 | [[ ]] |
-| Alarmes de sono (todos falsos) | 76 (28,5 por hora) | [[ ]] |
-| Avisos de atenção (todos falsos) | 219 (82,1 por hora) | [[ ]] |
+| Sensibilidade do bocejo (Mirror) | 46,1% (53 de 115) | 86,1% (99 de 115) |
+| Precisão do bocejo (Mirror) | 100,0% | 99,0% |
+| Medida F1 do bocejo (Mirror) | 63,1% | 92,1% |
+| Bocejo falso em vídeos de fala ou de condução normal | 0 de 205 | 1 de 205 |
+| Vídeos do Dash com bocejo encontrado | 15 de 29 | 28 de 29 |
+| Alarmes de sono (todos falsos) | 76 (28,5 por hora) | 6 (2,3 por hora) |
+| Avisos de atenção (todos falsos) | 219 (82,1 por hora) | 19 (7,1 por hora) |
 
 ::: Fonte: autoria própria
 
-A versão inicial era conservadora na direção errada para o bocejo: não inventava bocejos, com precisão de 100%, mas deixava passar mais da metade deles, e ao mesmo tempo emitia alarmes de sono e avisos de atenção em pessoas que não estavam sonolentas. A análise dos vídeos com erro mostrou causas recorrentes, e cada ajuste descrito no Capítulo 3 responde a uma delas. Bocejos de pico baixo passavam poucos décimos de segundo acima do limiar único de abertura e nunca completavam a duração mínima, o que motivou a histerese entre pico e sustentação. Bocejos com os lábios pouco abertos ou cobertos pela mão quase não alteravam o MAR, o que motivou o segundo caminho, pela mandíbula. Parte das participantes bocejava logo no início do vídeo, dentro da calibração, contaminando a referência, o que motivou o descarte dos quadros de boca aberta. Do lado dos alarmes falsos, os olhos se fechavam ao rir e falar, ao bocejar e logo depois dele, e a cabeça baixava quando o condutor olhava para o painel, situações tratadas pelas regras de fala, sorriso, bocejo e cabeça com olhos se fechando.
+Na versão final, a sensibilidade do bocejo quase dobrou, de 46,1% para 86,1%, ao custo de um único bocejo falso em 205 vídeos sem bocejo, e os alarmes de sono falsos caíram de 76 para 6, uma redução de 92%. A versão inicial era conservadora na direção errada para o bocejo: não inventava bocejos, com precisão de 100%, mas deixava passar mais da metade deles, e ao mesmo tempo emitia alarmes de sono e avisos de atenção em pessoas que não estavam sonolentas. A análise dos vídeos com erro mostrou causas recorrentes, e cada ajuste descrito no Capítulo 3 responde a uma delas. Bocejos de pico baixo passavam poucos décimos de segundo acima do limiar único de abertura e nunca completavam a duração mínima, o que motivou a histerese entre pico e sustentação. Bocejos com os lábios pouco abertos ou cobertos pela mão quase não alteravam o MAR, o que motivou o segundo caminho, pela mandíbula. Parte das participantes bocejava logo no início do vídeo, dentro da calibração, contaminando a referência, o que motivou o descarte dos quadros de boca aberta. Do lado dos alarmes falsos, os olhos se fechavam ao rir e falar, ao bocejar e logo depois dele, e a cabeça baixava quando o condutor olhava para o painel, situações tratadas pelas regras de fala, sorriso, bocejo e cabeça com olhos se fechando.
 
 ::: Figura 3: sensibilidade na detecção de bocejo por grupo de participantes
 
@@ -50,7 +50,7 @@ A versão inicial era conservadora na direção errada para o bocejo: não inven
 
 ::: Fonte: autoria própria
 
-A Figura 3 detalha a sensibilidade por grupo. [[PENDENTE: comentar os grupos com os números finais; na prévia de 30/09, mulheres e óculos escuros ficavam abaixo da média.]] Os bocejos ainda não detectados concentram-se em casos em que nem os lábios nem a mandíbula se movem o suficiente, como bocejos contidos ou cobertos pela mão, situação que está no limite do que os marcos faciais conseguem observar.
+A Figura 3 detalha a sensibilidade por grupo. Os maiores ganhos ocorreram justamente nos grupos em que a versão inicial era pior: entre as mulheres, a sensibilidade passou de 34,5% para 81,0%, e entre os participantes de óculos escuros, de 30,8% para 76,9%. A diferença entre mulheres e homens, de 23,4 pontos percentuais na versão inicial, caiu para 10,2 pontos, mas não desapareceu, e os óculos escuros continuam sendo o grupo de menor sensibilidade, além de concentrar o único bocejo falso. Os resultados por grupo devem ser lidos com cautela, porque alguns grupos são pequenos: há apenas 13 vídeos de bocejo com óculos escuros. Os bocejos ainda não detectados concentram-se em casos em que nem os lábios nem a mandíbula se movem o suficiente, como bocejos contidos ou cobertos pela mão, situação que está no limite do que os marcos faciais conseguem observar.
 
 Como os vídeos da YawDD são curtos, com um a dois minutos, as regras baseadas em frequência, como as três piscadas longas em dois minutos e o PERCLOS em janela de 60 segundos com ao menos 30 segundos de histórico, têm pouco tempo para agir. Os alarmes falsos medidos na base refletem, portanto, sobretudo as regras instantâneas.
 
