@@ -75,15 +75,30 @@ A validação cruzada também mostra quanto o resultado depende das pessoas aval
 
 ## 4.5 Desempenho no Raspberry Pi 5
 
-[[PENDENTE: Quadro 6 com os números do teste de resistência de 60 min (FPS médio, tempo por quadro médio/p95/p99, só MediaPipe e quadro completo, CPU, temperatura inicial/máxima/final, frequência mínima) e a Figura 4.]]
+O teste de resistência processou um vídeo da YawDD na maior velocidade possível por 20 minutos contínuos, num total de 44.253 quadros, com o rosto detectado em todos eles. O Quadro 6 resume o resultado, e a Figura 4 mostra a taxa de quadros e a temperatura ao longo do teste.
 
-::: Figura 4: taxa de quadros e temperatura no teste de resistência de 60 minutos
+::: Quadro 6: desempenho no teste de resistência de 20 minutos
+
+| Medida | Resultado |
+|---|---|
+| Taxa de quadros | média de 36,9 por segundo (mínima de 34,0 em intervalos de 10 s) |
+| Tempo por quadro, só o MediaPipe | média de 23,2 ms; 95% abaixo de 24,9 ms; 99% abaixo de 26,7 ms |
+| Tempo por quadro completo, até a decisão | média de 24,6 ms; 95% abaixo de 26,5 ms; 99% abaixo de 28,6 ms |
+| Uso do processador | média de 30%, máximo de 38% |
+| Temperatura | 57,3 °C no início, máxima de 60,0 °C, 59,5 °C no fim |
+| Frequência do processador | 2,4 GHz durante todo o teste |
+
+::: Fonte: autoria própria
+
+O desempenho se manteve estável do início ao fim: a temperatura se estabilizou em torno de 60 °C nos primeiros minutos, bem abaixo da faixa em que o processador reduz a frequência, que permaneceu em 2,4 GHz. A duração de 20 minutos foi suficiente por esse motivo: nas medições anteriores, a temperatura já se estabilizava entre 3 e 5 minutos, e a partir daí o comportamento não mudava. O quadro mais lento levou 129,8 ms, caso isolado, já que 99% dos quadros ficaram abaixo de 28,6 ms. Da média de 24,6 ms por quadro, 23,2 ms correspondem ao MediaPipe, executado em C++; a lógica escrita em Python, das medidas à decisão, responde por cerca de 1,4 ms, aproximadamente 6% do tempo.
+
+::: Figura 4: taxa de quadros e temperatura no teste de resistência de 20 minutos
 
 ![Figura 4](figuras/figura4_benchmark.svg)
 
 ::: Fonte: autoria própria
 
-Em uma medição curta anterior, de 30 de setembro, o sistema processou 36,3 quadros por segundo, com 25,0 ms em média por quadro completo, dos quais 23,6 ms correspondem ao MediaPipe, e percentil de 95% de 26,5 ms, com o processador a 2,4 GHz e temperatura máxima de 54,5 °C. O processamento, portanto, comporta com folga os 30 quadros por segundo com que a câmera opera ao vivo. A preparação destas medições revelou, porém, uma falha na versão anterior da captura: as imagens para a inferência e para a tela eram obtidas em duas leituras sucessivas, cada uma à espera de um quadro novo, o que descartava metade dos quadros. Somada ao modo de resolução máxima então usado, de 15,6 quadros por segundo, a falha limitava o sistema ao vivo a cerca de 7 a 8 quadros por segundo, valor confirmado pelos registros das sessões gravadas. Com a captura corrigida e o modo de 1296 × 972 pixels, a câmera passou a entregar 30 quadros por segundo, a mesma taxa dos vídeos da YawDD, de modo que as janelas de suavização, contadas em quadros, passaram a ter ao vivo a mesma duração que tiveram na avaliação. Nessa taxa, a mediana de três quadros usada no EAR acrescenta cerca de um quadro (33 ms) ao tempo de 1,5 segundo exigido para o alarme de sono, e o processamento de cada quadro, outras poucas dezenas de milissegundos, atrasos desprezíveis diante do tempo de reação humano.
+O processamento, portanto, comporta com folga os 30 quadros por segundo com que a câmera opera ao vivo. A preparação destas medições revelou, porém, uma falha na versão anterior da captura: as imagens para a inferência e para a tela eram obtidas em duas leituras sucessivas, cada uma à espera de um quadro novo, o que descartava metade dos quadros. Somada ao modo de resolução máxima então usado, de 15,6 quadros por segundo, a falha limitava o sistema ao vivo a cerca de 7 a 8 quadros por segundo, valor confirmado pelos registros das sessões gravadas. Com a captura corrigida e o modo de 1296 × 972 pixels, a câmera passou a entregar 30 quadros por segundo, a mesma taxa dos vídeos da YawDD, de modo que as janelas de suavização, contadas em quadros, passaram a ter ao vivo a mesma duração que tiveram na avaliação. Nessa taxa, a mediana de três quadros usada no EAR acrescenta cerca de um quadro (33 ms) ao tempo de 1,5 segundo exigido para o alarme de sono, e o processamento de cada quadro, outras poucas dezenas de milissegundos, atrasos desprezíveis diante do tempo de reação humano.
 
 O registro de energia do Raspberry Pi, no entanto, indicou subtensão e redução de velocidade desde a inicialização. A placa exige fonte de 5 V e até 5 A²⁵, e a fonte usada no desenvolvimento não atendia plenamente a essa especificação. Embora a frequência do processador tenha permanecido em 2,4 GHz durante as medições, a instalação no veículo requer uma fonte dimensionada para a placa, já que a tensão de um sistema automotivo varia com a partida do motor e com a carga elétrica.
 

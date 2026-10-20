@@ -180,14 +180,14 @@ def figura_bocejo():
 # ---------------------------------------------------------------------------
 
 def benchmark_resistencia():
-    """intervalos.csv do teste mais longo e mais recente (de preferência ~60 min)."""
+    """intervalos.csv do teste mais longo e mais recente (de preferência 15 min ou mais)."""
     candidatos = []
     for arq in (PROJETO / "benchmark_resultados").glob("*/intervalos.csv"):
         if (arq.parent / "NAO_USAR.txt").exists():   # medição contaminada
             continue
         linhas = list(csv.DictReader(open(arq)))
         if linhas:
-            candidatos.append((float(linhas[-1]["min"]) >= 50, arq.parent.name, arq, linhas))
+            candidatos.append((float(linhas[-1]["min"]) >= 15, arq.parent.name, arq, linhas))
     if not candidatos:
         return None, []
     _, _, arq, linhas = max(candidatos)
@@ -223,7 +223,7 @@ def figura_benchmark():
     fig.align_ylabels((ax1, ax2))
     salvar(fig, "figura4_benchmark.svg")
     print(f"    (dados: {arq.parent.name}, {minutos[-1]:.0f} min"
-          + ("" if minutos[-1] >= 50 else "; ainda não é o teste de 60 min") + ")")
+          + ("" if minutos[-1] >= 15 else "; ainda não é o teste de resistência") + ")")
 
 
 if __name__ == "__main__":
