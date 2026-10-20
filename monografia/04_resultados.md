@@ -56,11 +56,26 @@ Como os vídeos da YawDD são curtos, com um a dois minutos, as regras baseadas 
 
 ## 4.4 Validação cruzada por participante
 
-[[PENDENTE: resultado do validacao_cruzada.py: sensibilidade e taxa de falso positivo por dobra e no conjunto, comparadas com o resultado da regra final sobre a base inteira. A diferença entre os dois é a estimativa do otimismo causado pelo ajuste na própria base.]]
+O Quadro 5 compara o desempenho da regra final, ajustada observando todos os vídeos, com o da validação cruzada em cinco dobras de 18 participantes, em que cada vídeo foi avaliado por limiares escolhidos sem ver aquela pessoa.
+
+::: Quadro 5: detecção de bocejo com a regra final e na validação cruzada por participante
+
+| Medida (conjunto Mirror) | Regra final, ajustada em todos os vídeos | Validação cruzada (5 dobras) |
+|---|---|---|
+| Sensibilidade | 86,1% | 87,8% |
+| Precisão | 99,0% | 96,2% |
+| Medida F1 | 92,1% | 91,8% |
+| Bocejo falso em vídeos de fala ou de condução normal | 1 de 205 (0,5%) | 4 de 205 (2,0%) |
+
+::: Fonte: autoria própria
+
+A medida F1 praticamente não muda entre as duas colunas, o que indica que o ajuste feito na própria base não inflou o resultado de forma relevante: para pessoas que os limiares não viram, o desempenho esperado é equivalente. A diferença está no equilíbrio entre sensibilidade e precisão. Em todas as cinco dobras, a escolha automática preferiu um pico de abertura da boca menor (0,50 em vez de 0,55), que encontra mais bocejos, mas também inventa mais. A regra final mantém o valor mais conservador de propósito, porque um sistema que acusa fadiga quando o condutor apenas conversa tende a ser desligado por ele.
+
+A validação cruzada também mostra quanto o resultado depende das pessoas avaliadas. Com a regra final fixa, a sensibilidade variou de 75,0% a 95,5% entre as cinco dobras, uma amplitude maior que qualquer diferença entre as alternativas de ajuste testadas. Os alarmes falsos se concentraram da mesma forma: dos 6 alarmes de sono e 19 avisos de atenção emitidos pela regra final, 5 alarmes e 12 avisos ocorreram em uma única dobra, ou seja, em um mesmo grupo de 18 participantes.
 
 ## 4.5 Desempenho no Raspberry Pi 5
 
-[[PENDENTE: Quadro 5 com os números do teste de resistência de 60 min (FPS médio, tempo por quadro médio/p95/p99, só MediaPipe e quadro completo, CPU, temperatura inicial/máxima/final, frequência mínima) e a Figura 4.]]
+[[PENDENTE: Quadro 6 com os números do teste de resistência de 60 min (FPS médio, tempo por quadro médio/p95/p99, só MediaPipe e quadro completo, CPU, temperatura inicial/máxima/final, frequência mínima) e a Figura 4.]]
 
 ::: Figura 4: taxa de quadros e temperatura no teste de resistência de 60 minutos
 
