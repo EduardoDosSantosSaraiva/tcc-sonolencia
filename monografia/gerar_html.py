@@ -47,6 +47,11 @@ CSS = """
  body.capa{text-align:center}
  body.capa h1,body.capa h2{text-align:center;margin:1.6em 0}
  body.capa p{text-indent:0;text-align:justify}
+ p.legenda{text-indent:0;text-align:center;margin:12pt 0 6pt}
+ p.eq{text-indent:0;text-align:center;position:relative;margin:6pt 0 12pt}
+ p.eq .num{position:absolute;right:0}
+ table{border-collapse:collapse;width:100%;font-size:10pt;line-height:1.1;margin:0;page-break-inside:avoid}
+ th,td{border:1px solid #000;padding:3pt 4pt;text-align:left;vertical-align:top}
  @media print{body{margin:0;max-width:none}}
 """
 
@@ -58,6 +63,8 @@ def inline(texto):
     t = re.sub(r"`([^`]+?)`", r"<code>\1</code>", t)
     t = re.sub(r"\[(.+?)\]\((.+?)\)", r'<a href="\2">\1</a>', t)
     t = t.replace("\\_", "_")
+    # índice: p~2~ vira p com 2 subscrito (variáveis das equações)
+    t = re.sub(r"~([^~\s]{1,12})~", r"<sub>\1</sub>", t)
     # sequências de dígitos sobrescritos viram <sup> de verdade
     t = re.sub(r"[⁰¹²³⁴⁵⁶⁷⁸⁹]+",
                lambda m: "<sup>" + "".join(SUPERSCRITOS[c] for c in m.group(0)) + "</sup>", t)
@@ -66,7 +73,7 @@ def inline(texto):
 
 def converter(caminho_md):
     origem = Path(caminho_md)
-    linhas, em_lista, em_nota = [], False, False
+    linhas, em_lista, em_nota, em_tabela = [], False, False, False
 
     def fecha_lista():
         nonlocal em_lista
@@ -80,11 +87,43 @@ def converter(caminho_md):
             linhas.append("</div>")
             em_nota = False
 
+    def fecha_tabela():
+        nonlocal em_tabela
+        if em_tabela:
+            linhas.append("</table>")
+            em_tabela = False
+
     for bruta in origem.read_text().split("\n"):
         linha = bruta.rstrip()
         if not linha.strip():
             fecha_lista()
             fecha_nota()
+            fecha_tabela()
+            continue
+        # quadro: | a | b |, a primeira linha é o cabeçalho e |---| é ignorada
+        if linha.startswith("|"):
+            celulas = [c.strip() for c in linha.strip("|").split("|")]
+            if all(re.fullmatch(r":?-+:?", c) for c in celulas):
+                continue
+            tag = "td" if em_tabela else "th"
+            if not em_tabela:
+                linhas.append("<table>")
+                em_tabela = True
+            linhas.append("<tr>" + "".join(f"<{tag}>{inline(c)}</{tag}>" for c in celulas) + "</tr>")
+            continue
+        fecha_tabela()
+        # legenda centralizada de figura/quadro e a linha de fonte: "::: texto"
+        if linha.startswith("::: "):
+            fecha_lista()
+            linhas.append('<p class="legenda">' + inline(linha[4:]) + "</p>")
+            continue
+        # equação centralizada com o número à direita: "$$ fórmula | (1)"
+        if linha.startswith("$$ "):
+            fecha_lista()
+            formula, _, numero = linha[3:].rpartition(" | ")
+            formula = formula or numero
+            numero = numero if formula is not numero else ""
+            linhas.append(f'<p class="eq">{inline(formula)}<span class="num">{html.escape(numero)}</span></p>')
             continue
         if linha.strip() == ">" and em_nota:
             continue  # linha em branco dentro de uma citação: mantém o bloco aberto
@@ -116,6 +155,7 @@ def converter(caminho_md):
                 linhas.append(f"<p{classe}>" + inline(linha) + "</p>")
     fecha_lista()
     fecha_nota()
+    fecha_tabela()
 
     corpo_classe = ' class="capa"' if origem.stem.startswith("00_") else ""
     titulo = APELIDOS.get(origem.stem, origem.stem)

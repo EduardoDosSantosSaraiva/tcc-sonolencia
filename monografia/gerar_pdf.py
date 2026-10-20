@@ -15,7 +15,8 @@ reportlab + pypdf (o Chromium não sabe numerar no canto superior direito).
 
 Uso:
     ../venv/bin/python gerar_pdf.py                  # capa + introdução
-    ../venv/bin/python gerar_pdf.py --tudo           # todas as folhas pré-textuais
+    ../venv/bin/python gerar_pdf.py --texto          # capa + todos os capítulos escritos
+    ../venv/bin/python gerar_pdf.py --tudo           # folhas pré-textuais + todos os capítulos
 """
 
 import io
@@ -60,7 +61,17 @@ CSS = """
  .c-ano{top:672pt}
  .pagina{page-break-after:always}
  .pagina:last-child{page-break-after:auto}
+ .capitulo+.capitulo{margin-top:24pt}
+ .refs{page-break-before:always}
+ p.legenda{text-indent:0;text-align:center;margin:12pt 0 6pt;page-break-after:avoid}
+ p.eq{text-indent:0;text-align:center;position:relative;margin:6pt 0 12pt}
+ p.eq .num{position:absolute;right:0}
+ table{border-collapse:collapse;width:100%;font-size:10pt;line-height:1.1;margin:0;page-break-inside:avoid}
+ table+p.legenda{page-break-before:avoid}
+ th,td{border:1px solid #000;padding:3pt 4pt;text-align:left;vertical-align:top}
 """
+
+TITULO_REFS = "<h1>REFERÊNCIAS BIBLIOGRÁFICAS</h1>"
 
 
 def corpo(caminho):
@@ -74,6 +85,33 @@ def corpo(caminho):
     miolo = re.sub(r'<div class="nota">\s*<p>\s*<strong>Título sugerido.*?</div>',
                    "", miolo, flags=re.S)
     return miolo.strip()
+
+
+def separar_referencias(miolo):
+    """Cada capítulo lista no fim só as referências que ele cita primeiro,
+    já com a numeração global. Devolve (texto sem a lista, {número: <p>})."""
+    corte = miolo.find(TITULO_REFS)
+    if corte == -1:
+        return miolo, {}
+    refs = {int(n): p for p, n in
+            re.findall(r'(<p class="ref">(\d+)\..*?</p>)', miolo[corte:], re.S)}
+    return miolo[:corte].strip(), refs
+
+
+def conferir_citacoes(texto, refs):
+    """Avisa de citação sem referência, referência nunca citada e número novo
+    fora da ordem de primeira citação (o sistema numérico da ABNT exige)."""
+    citados = [int(n) for n in re.findall(r"<sup>(\d+)</sup>", texto)]
+    vistos, maior = set(), 0
+    for n in citados:
+        if n not in vistos and n != maior + 1:
+            print(f"  Aviso: a referência {n} aparece pela primeira vez depois da {maior}.")
+        vistos.add(n)
+        maior = max(maior, n)
+    for n in sorted(vistos - refs.keys()):
+        print(f"  Aviso: citação {n} sem referência na lista.")
+    for n in sorted(refs.keys() - vistos):
+        print(f"  Aviso: referência {n} não é citada no texto.")
 
 
 def capa():
@@ -128,29 +166,52 @@ def numerar(pdf, primeira=1, pular=0):
 
 def main():
     tudo = "--tudo" in sys.argv
-    capitulos = (["00_pre_textual.html", "01_introducao.html"] if tudo
-                 else ["01_introducao.html"])
-    saida = AQUI / ("TCC - texto parcial.pdf" if tudo else "TCC - Introducao.pdf")
+    texto = tudo or "--texto" in sys.argv
+    # capítulos escritos até agora: 01_introducao, 02_fundamentacao, ...
+    capitulos = (sorted(p.with_suffix(".html").name for p in AQUI.glob("0[1-9]_*.md"))
+                 if texto else ["01_introducao.html"])
+    for nome in capitulos + (["00_pre_textual.html"] if tudo else []):
+        if not (AQUI / nome).exists():
+            print(f"Faltando {nome}: rode antes 'python3 gerar_html.py'")
+            sys.exit(1)
+    if tudo:
+        saida = AQUI / "TCC - texto parcial.pdf"
+    elif texto:
+        saida = AQUI / f"TCC - Capitulos 1 a {int(capitulos[-1][:2])}.pdf"
+    else:
+        saida = AQUI / "TCC - Introducao.pdf"
 
     chromium = shutil.which("chromium") or shutil.which("chromium-browser")
     if not chromium:
         print("Chromium não encontrado — não dá pra gerar o PDF.")
         sys.exit(1)
 
-    partes = [] if tudo else [capa()]
-    for nome in capitulos:
-        arquivo = AQUI / nome
-        if not arquivo.exists():
-            print(f"Faltando {nome}: rode antes 'python3 gerar_html.py'")
-            sys.exit(1)
-        pre_textual = nome.startswith("00_")
-        for pagina in re.split(r"<hr>", corpo(arquivo)):
-            if not pagina.strip():
-                continue
-            # nas folhas pré-textuais cada bloco é uma página; no texto corrido,
-            # só as referências começam em página nova
-            classe = "pagina capa" if pre_textual else "pagina"
-            partes.append(f'<div class="{classe}">{pagina}</div>')
+    partes = []
+    if tudo:
+        # nas folhas pré-textuais cada bloco separado por --- é uma página
+        for pagina in re.split(r"<hr>", corpo(AQUI / "00_pre_textual.html")):
+            if pagina.strip():
+                partes.append(f'<div class="pagina capa">{pagina}</div>')
+    else:
+        partes.append(capa())
+
+    if not texto:
+        # só a introdução, do jeito que foi entregue ao orientador
+        partes.append(f'<div class="pagina">{corpo(AQUI / "01_introducao.html")}</div>')
+    else:
+        # texto corrido, capítulo após capítulo, e uma lista única de referências
+        refs, textos = {}, []
+        for nome in capitulos:
+            miolo, novas = separar_referencias(corpo(AQUI / nome))
+            for n in sorted(novas.keys() & refs.keys()):
+                if novas[n] != refs[n]:
+                    print(f"  Aviso: a referência {n} aparece diferente em {nome}.")
+            refs.update(novas)
+            textos.append(f'<div class="capitulo">{miolo}</div>')
+        conferir_citacoes("".join(textos), refs)
+        partes += textos
+        partes.append(f'<div class="refs">{TITULO_REFS}'
+                      + "".join(refs[n] for n in sorted(refs)) + "</div>")
 
     documento = ('<!doctype html>\n<html lang="pt-BR"><head><meta charset="utf-8">'
                  "<title>TCC</title>\n"
