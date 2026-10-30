@@ -594,25 +594,33 @@ def _build_camera_config(picam2):
     # pede o modo do sensor explicitamente: só pelo tamanho da saída o
     # Picamera2 poderia escolher um modo recortado
     sensor = {"output_size": mode["size"], "bit_depth": mode.get("bit_depth", 10)}
+    # No Picamera2 o nome do formato segue a convenção DRM (little-endian):
+    # "RGB888" chega no numpy na ordem [B, G, R] e "BGR888" na ordem
+    # [R, G, B]. O resto do programa trata o quadro como RGB (é o que o
+    # MediaPipe espera), então o certo é BGR888. Com RGB888 o MediaPipe
+    # recebia vermelho e azul trocados: medido no YawDD, o jawOpen passa de
+    # 0,60 em bem menos quadros de bocejo (30 -> 6 num vídeo) e o EAR varia
+    # até 13% (efeito_cor, 30/10/2026)
+    PIXEL_FORMAT = "BGR888"
 
     attempts = [
         lambda: picam2.create_video_configuration(
-            main={"size": main_size, "format": "RGB888"},
-            lores={"size": LORES_SIZE, "format": "RGB888"},
+            main={"size": main_size, "format": PIXEL_FORMAT},
+            lores={"size": LORES_SIZE, "format": PIXEL_FORMAT},
             sensor=sensor, controls=controls,
         ),
         lambda: picam2.create_video_configuration(
-            main={"size": main_size, "format": "RGB888"},
+            main={"size": main_size, "format": PIXEL_FORMAT},
             lores={"size": LORES_SIZE, "format": "YUV420"},
             sensor=sensor, controls=controls,
         ),
         lambda: picam2.create_video_configuration(
-            main={"size": main_size, "format": "RGB888"},
+            main={"size": main_size, "format": PIXEL_FORMAT},
             lores={"size": LORES_SIZE, "format": "YUV420"},
             controls=controls,
         ),
         lambda: picam2.create_preview_configuration(
-            main={"size": LORES_SIZE, "format": "RGB888"}, controls=controls
+            main={"size": LORES_SIZE, "format": PIXEL_FORMAT}, controls=controls
         ),
     ]
 
