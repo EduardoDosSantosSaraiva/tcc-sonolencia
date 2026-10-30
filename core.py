@@ -155,24 +155,8 @@ HEAD_DOWN_SECONDS_ALERT = 1.0   # duração contínua de cabeça caída pra cont
                                   # o episódio e/ou elevar o nível agora
 HEAD_DOWN_WINDOW_SECONDS = 120  # janela deslizante p/ frequência de quedas de cabeça
 HEAD_DOWN_REQUIRES_EYES = True  # queda de cabeça só conta com o olho semicerrado ou
-                                 # fechado junto (ou em modo óculos escuros)
+                                 # fechado junto
 HEAD_DOWN_FREQ_ALERT = 2        # nº de quedas de cabeça na janela que já eleva o nível
-
-# Óculos escuros (ou qualquer oclusão) deixam o EAR não confiável — a região
-# do olho fica escura/sem contraste mesmo com o rosto bem iluminado. Em vez
-# de limiar absoluto de brilho (varia com iluminação/exposição automática),
-# compara o brilho da região do olho com o resto do rosto no mesmo frame.
-DARK_EYES_BRIGHTNESS_RATIO = 0.70   # olho com brilho médio abaixo dessa fração
-                                      # do resto do rosto = suspeito de lente escura.
-                                      # Era 0.45 — testado ao vivo com óculos escuro
-                                      # polarizado de verdade, a razão ficou em 0.63
-                                      # (sem óculos fica ~0.95-1.0), então 0.45 nunca
-                                      # cruzava. 0.70 dá margem confortável dos dois lados
-DARK_EYES_MIN_FACE_BRIGHTNESS = 25  # abaixo disso o rosto inteiro já tá escuro
-                                      # demais (ambiente, não óculos) — não mede
-DARK_EYES_ENTER_SECONDS = 3.0   # tempo contínuo escuro pra confirmar "modo óculos
-                                  # escuros" (evita entrar por causa de 1 piscada)
-DARK_EYES_EXIT_SECONDS = 2.0    # tempo contínuo claro pra sair do modo
 
 SMOOTHING_WINDOW = 3          # mediana de N frames p/ ignorar ruído de 1 frame só
                                # (reflexo de óculos, blink parcial, glitch de tracking)
@@ -404,8 +388,7 @@ def realcar_pouca_luz(frame_rgb):
     """Em frame escuro, equaliza o contraste local (CLAHE) só no canal de
     luminância, pra o detector de rosto achar o rosto que ficou perdido no
     escuro. Frame claro volta sem mudança (e sem custo além de medir o
-    brilho). Serve só pra entrada do MediaPipe: a medida de brilho do olho
-    (modo óculos) continua usando o frame original."""
+    brilho). Serve só pra entrada do MediaPipe."""
     import cv2
 
     if cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2GRAY).mean() >= LOW_LIGHT_MEAN:
@@ -455,68 +438,6 @@ def _face_bbox_area(landmarks):
     xs = [lm.x for lm in landmarks]
     ys = [lm.y for lm in landmarks]
     return (max(xs) - min(xs)) * (max(ys) - min(ys))
-
-
-def eye_region_darkness(frame, landmarks, w, h):
-    """Retorna (brilho_medio_olhos, brilho_medio_rosto), 0-255, ou (None,
-    None) se alguma das regiões não puder ser recortada. Usado pra estimar
-    se os olhos estão cobertos por lente escura: compara o brilho da região
-    ao redor dos olhos com o resto do rosto no mesmo frame, em vez de um
-    limiar absoluto (que variaria com iluminação ambiente e exposição
-    automática da câmera)."""
-    import cv2
-
-    xs_face = [lm.x for lm in landmarks]
-    ys_face = [lm.y for lm in landmarks]
-    fx1, fy1 = max(0, int(min(xs_face) * w)), max(0, int(min(ys_face) * h))
-    fx2, fy2 = int(max(xs_face) * w), int(max(ys_face) * h)
-    face_roi = frame[fy1:fy2, fx1:fx2]
-
-    eye_idx = LEFT_EYE + RIGHT_EYE
-    xs_eye = [landmarks[i].x for i in eye_idx]
-    ys_eye = [landmarks[i].y for i in eye_idx]
-    pad = int(0.02 * w)  # expande um pouco além dos pontos pra cobrir a lente
-    ex1, ey1 = max(0, int(min(xs_eye) * w) - pad), max(0, int(min(ys_eye) * h) - pad)
-    ex2, ey2 = int(max(xs_eye) * w) + pad, int(max(ys_eye) * h) + pad
-    eye_roi = frame[ey1:ey2, ex1:ex2]
-
-    if face_roi.size == 0 or eye_roi.size == 0:
-        return None, None
-
-    face_gray = cv2.cvtColor(face_roi, cv2.COLOR_RGB2GRAY) if face_roi.ndim == 3 else face_roi
-    eye_gray = cv2.cvtColor(eye_roi, cv2.COLOR_RGB2GRAY) if eye_roi.ndim == 3 else eye_roi
-    return float(np.mean(eye_gray)), float(np.mean(face_gray))
-
-
-class DarkEyesTracker:
-    """Detecta, com histerese, se a região dos olhos está consistentemente
-    escura/sem contraste em relação ao resto do rosto (indício de óculos
-    escuros). Exige DARK_EYES_ENTER_SECONDS contínuos escuro pra ativar o
-    modo, e DARK_EYES_EXIT_SECONDS contínuos claro pra desativar — evita
-    ficar entrando/saindo a cada frame por ruído momentâneo (sombra,
-    piscada, ângulo)."""
-
-    def __init__(self, enter_seconds, exit_seconds):
-        self.enter_seconds = enter_seconds
-        self.exit_seconds = exit_seconds
-        self.dark_since = None
-        self.bright_since = None
-        self.active = False
-
-    def update(self, is_dark, t):
-        if is_dark:
-            self.bright_since = None
-            if self.dark_since is None:
-                self.dark_since = t
-            if not self.active and (t - self.dark_since) >= self.enter_seconds:
-                self.active = True
-        else:
-            self.dark_since = None
-            if self.bright_since is None:
-                self.bright_since = t
-            if self.active and (t - self.bright_since) >= self.exit_seconds:
-                self.active = False
-        return self.active
 
 
 def select_driver_index(face_landmarks_list):
@@ -960,7 +881,6 @@ class DrowsinessState:
         )
         self.head_down_tracker = SustainedSignalTracker(
             HEAD_DOWN_SECONDS_ALERT, HEAD_DOWN_WINDOW_SECONDS, grace_seconds=HEAD_DOWN_GRACE_SECONDS)
-        self.dark_eyes_tracker = DarkEyesTracker(DARK_EYES_ENTER_SECONDS, DARK_EYES_EXIT_SECONDS)
         self.perclos_tracker = PerclosTracker()
         self.mouth_openings = deque()   # instantes em que o MAR cruzou TALKING_MAR subindo
         self.last_mar_raw = None
@@ -971,25 +891,23 @@ class DrowsinessState:
         """Conta um bocejo visto fora do monitoramento (durante a calibração)."""
         self.yawn_events.record(t)
 
-    def update(self, left_ear, right_ear, mar, head_pitch, eyes_dark, face_detected, t, jaw_open=None,
+    def update(self, left_ear, right_ear, mar, head_pitch, face_detected, t, jaw_open=None,
                smile=None):
         """Igual a _update, mais a chave "distraido": rosto sumido há mais de
         DISTRACTION_SECONDS depois de já ter sido visto (sem rosto desde o
         início não conta: pode ser a câmera ainda sendo posicionada).
         jaw_open: blendshape jawOpen do MediaPipe (0 a 1), se disponível.
         smile: sorriso de 0 a 1 (ver sorriso()), se disponível."""
-        st = self._update(left_ear, right_ear, mar, head_pitch, eyes_dark, face_detected, t, jaw_open, smile)
+        st = self._update(left_ear, right_ear, mar, head_pitch, face_detected, t, jaw_open, smile)
         sem_rosto = None if st["face_detected"] or self.last_face_seen is None else t - self.last_face_seen
         st["distraido"] = sem_rosto is not None and DISTRACTION_SECONDS <= sem_rosto < DISTRACTION_MAX_SECONDS
         if st["distraido"]:
             st["status"] = f"SEM ROSTO ha {sem_rosto:.0f}s: OLHE PARA A ESTRADA"
         return st
 
-    def _update(self, left_ear, right_ear, mar, head_pitch, eyes_dark, face_detected, t, jaw_open=None,
+    def _update(self, left_ear, right_ear, mar, head_pitch, face_detected, t, jaw_open=None,
                 smile=None):
-        """t: tempo do stream em segundos. eyes_dark: True/False se foi
-        possível medir o contraste da região do olho nesse frame, None se
-        não (ex.: sem frame de imagem disponível). Retorna um dict com
+        """t: tempo do stream em segundos. Retorna um dict com
         status/cor/nível/métricas pro chamador desenhar e logar."""
         if face_detected and left_ear is not None and right_ear is not None:
             self.last_face_seen = t
@@ -1044,31 +962,14 @@ class DrowsinessState:
                 self.last_yawn_t = t
             yawn_related = self.last_yawn_t is not None and t - self.last_yawn_t <= YAWN_EYE_GRACE_SECONDS
 
-            # Óculos escuros (ou qualquer oclusão) deixam o EAR não confiável
-            # — se a região do olho está consistentemente escura/sem
-            # contraste em relação ao rosto, para de confiar nele de vez e
-            # passa a depender só de bocejo/cabeça (ver eye_region_darkness).
-            glasses_mode = (
-                self.dark_eyes_tracker.update(eyes_dark, t)
-                if eyes_dark is not None else self.dark_eyes_tracker.active
-            )
-
-            # PERCLOS conta com o EAR bruto (both_closed), não com o glasses_mode
-            # aplicado — mas em modo óculos escuros o EAR não é confiável, então
-            # trata como "não fechado" pra não viciar a métrica com leitura ruim.
-            # Olho fechado no bocejo também não entra: é fadiga, que tem aviso
+            # Olho fechado no bocejo não entra no PERCLOS: é fadiga, que tem aviso
             # próprio, não sono (nos vídeos do painel do YawDD, a maior parte
             # dos avisos de PERCLOS era olho fechado bocejando)
             perclos_closed = l_med < self.perclos_ear_threshold and r_med < self.perclos_ear_threshold
-            self.perclos_tracker.update(t, perclos_closed and not glasses_mode and not yawn_related)
+            self.perclos_tracker.update(t, perclos_closed and not yawn_related)
             perclos_value = self.perclos_tracker.value()
 
-            if glasses_mode:
-                self.closed_since = None
-                level = "aberto"
-                status = "MODO OCULOS ESCUROS: EAR nao confiavel, monitorando boca/cabeca"
-                color = (180, 180, 0)
-            elif both_closed:
+            if both_closed:
                 if self.closed_since is None:
                     self.closed_since = t
                 if yawn_related:
@@ -1130,11 +1031,8 @@ class DrowsinessState:
             )
             # Cabeça baixa de olho aberto é o motorista olhando o painel, o
             # rádio ou o retrovisor (no YawDD isso dava 103 dos 160 avisos
-            # falsos); cochilo é a cabeça pendendo com o olho fechando. Em
-            # modo óculos escuros o olho não é medível e a cabeça vale sozinha.
-            is_head_down = head_pitch_down and (
-                not HEAD_DOWN_REQUIRES_EYES or both_almost or glasses_mode
-            )
+            # falsos); cochilo é a cabeça pendendo com o olho fechando
+            is_head_down = head_pitch_down and (not HEAD_DOWN_REQUIRES_EYES or both_almost)
             if is_head_down:
                 self.last_head_down_t = t
             head_down_dur, head_down_count_recent = self.head_down_tracker.update(is_head_down, t)
@@ -1189,7 +1087,6 @@ class DrowsinessState:
                 "atencao_by_yawn": atencao_by_yawn,
                 "atencao_by_head": atencao_by_head,
                 "atencao_by_perclos": atencao_by_perclos,
-                "modo_oculos_escuros": glasses_mode,
                 "ear_left": l_med, "ear_right": r_med,
                 "ear_avg": (l_med + r_med) / 2.0,
                 "mar": mar_med, "jaw_open": jaw_med, "yawning": is_yawning, "yawn_count_recent": yawn_count_recent,
@@ -1213,7 +1110,6 @@ class DrowsinessState:
                 "blink_count_recent": self.long_blink_tracker.count(t),
                 "atencao_by_blinks": False, "atencao_by_yawn": False, "atencao_by_head": False,
                 "atencao_by_perclos": False,
-                "modo_oculos_escuros": self.dark_eyes_tracker.active,
                 "mar": None, "yawning": False, "yawn_count_recent": self.yawn_events.count(t),
                 "head_pitch": None, "head_down": False,
                 "head_down_count_recent": self.head_down_tracker.freq.count(t),
@@ -1232,7 +1128,6 @@ class DrowsinessState:
                 "blink_count_recent": self.long_blink_tracker.count(t),
                 "atencao_by_blinks": False, "atencao_by_yawn": False, "atencao_by_head": False,
                 "atencao_by_perclos": False,
-                "modo_oculos_escuros": self.dark_eyes_tracker.active,
                 "mar": None, "yawning": False, "yawn_count_recent": self.yawn_events.count(t),
                 "head_pitch": None, "head_down": False,
                 "head_down_count_recent": self.head_down_tracker.freq.count(t),
@@ -1258,8 +1153,6 @@ class DrowsinessState:
         if caiu_pra_fora and self.head_down_tracker.freq.count(t) == antes:
             self.head_down_tracker.freq.record(t)
         self.last_head_down_t = None
-        self.dark_eyes_tracker.dark_since = None
-        self.dark_eyes_tracker.bright_since = None
         return {
             "status": "SEM ROSTO", "color": (128, 128, 128), "level": "sem_rosto",
             "ear_left": None, "ear_right": None, "ear_avg": None,
@@ -1267,7 +1160,6 @@ class DrowsinessState:
             "blink_count_recent": self.long_blink_tracker.count(t),
             "atencao_by_blinks": False, "atencao_by_yawn": False, "atencao_by_head": False,
             "atencao_by_perclos": False,
-            "modo_oculos_escuros": self.dark_eyes_tracker.active,
             "mar": None, "yawning": False, "yawn_count_recent": self.yawn_events.count(t),
             "head_pitch": None, "head_down": False,
             "head_down_count_recent": self.head_down_tracker.freq.count(t),

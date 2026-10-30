@@ -5,13 +5,13 @@
   "bocejos_falsos": 1,
   "dash_com_bocejo": 28,
   "alarmes_falsos": 6,
-  "avisos_falsos": 19,
-  "alarmes_reais": 80,
-  "alarmes_reais_mantidos": 61
+  "avisos_falsos": 17,
+  "alarmes_reais": 86,
+  "alarmes_reais_mantidos": 65
  },
  "por_video": {
   "Dash/Female/1-FemaleNoGlasses.avi": {
-   "bocejos": 1,
+   "bocejos": 3,
    "alarmes": 0,
    "avisos": 0
   },
@@ -113,7 +113,7 @@
   "Dash/Male/16-MaleNoGlasses.avi": {
    "bocejos": 2,
    "alarmes": 0,
-   "avisos": 1
+   "avisos": 0
   },
   "Dash/Male/2-MaleGlasses.avi": {
    "bocejos": 1,
@@ -1151,7 +1151,7 @@
    "avisos": 0
   },
   "Mirror/Male_mirror Avi Videos/22-MaleGlassesmoustache-Yawning.avi": {
-   "bocejos": 2,
+   "bocejos": 3,
    "alarmes": 0,
    "avisos": 0
   },
@@ -1478,7 +1478,7 @@
   "Mirror/Male_mirror Avi Videos/36-MaleSunGlasses-Talking.avi": {
    "bocejos": 0,
    "alarmes": 0,
-   "avisos": 1
+   "avisos": 0
   },
   "Mirror/Male_mirror Avi Videos/36-MaleSunGlasses-Yawning.avi": {
    "bocejos": 1,

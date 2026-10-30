@@ -391,8 +391,8 @@ def process_frame(landmarker, timestamp, MpImage, MpImageFormat, infer_frame, iw
         return None
     latency_ms = (time.perf_counter() - t_infer_start) * 1000
 
-    left_ear = right_ear = mar = head_pitch = eyes_dark = None
-    eye_bright = face_bright = abertura_boca = abertura_boca_ext = queixo = None
+    left_ear = right_ear = mar = head_pitch = None
+    abertura_boca = abertura_boca_ext = queixo = None
     left_ear3d = right_ear3d = mar3d = yaw = None   # em estudo (rosto de lado)
     idx = core.select_driver_index(result.face_landmarks)
     landmarks = result.face_landmarks[idx] if idx is not None else None
@@ -409,14 +409,10 @@ def process_frame(landmarker, timestamp, MpImage, MpImageFormat, infer_frame, iw
         right_ear3d = core.aspect_ratio_3d(landmarks, core.RIGHT_EYE, iw, ih)
         mar3d = core.aspect_ratio_3d(landmarks, core.MOUTH, iw, ih)
         yaw = core.head_yaw_deg(landmarks, iw, ih)
-        eye_bright, face_bright = core.eye_region_darkness(infer_frame, landmarks, iw, ih)
-        if eye_bright is not None and face_bright is not None and face_bright > core.DARK_EYES_MIN_FACE_BRIGHTNESS:
-            eyes_dark = eye_bright < face_bright * core.DARK_EYES_BRIGHTNESS_RATIO
 
     return {
         "left_ear": left_ear, "right_ear": right_ear, "mar": mar,
-        "head_pitch": head_pitch, "eyes_dark": eyes_dark,
-        "eye_bright": eye_bright, "face_bright": face_bright,
+        "head_pitch": head_pitch,
         "face_detected": face_detected, "landmarks": landmarks,
         "abertura_boca": abertura_boca, "abertura_boca_ext": abertura_boca_ext,
         "queixo": queixo, "blendshapes": core.blendshapes_do_rosto(result, idx),
@@ -582,18 +578,20 @@ SELF_TEST_SCENARIOS = [
         "não contou a queda de cabeça (confira se a calibração de pitch rodou)",
     ),
     (
-        # O que importa de óculos é o sistema não ficar cego sem saber: ou
-        # enxerga o olho através da lente (lente clara/polarizada, o EAR segue
-        # valendo e o microssono dispara) ou percebe que não enxerga e entra no
-        # modo óculos (lente escura, passa a vigiar boca/cabeça). Falha só se
-        # nenhum dos dois acontecer.
+        # De óculos o microssono tem que disparar igual: a luz infravermelha
+        # da câmera atravessa a lente (escura ou polarizada) e o EAR enxerga o
+        # olho. Havia um modo óculos que, com a região do olho escura, parava
+        # de olhar o olho; saiu em 30/10/2026, porque com infravermelho a lente
+        # não esconde o olho e o modo quase ligou num olho fechado sem óculos
+        # (razão de brilho 0,71 contra o limiar de 0,70), o que desligaria o
+        # alarme principal no meio de um cochilo.
         "Óculos",
         "Cenário oito, óculos. Coloque os óculos, escuro ou polarizado, e olhe para a frente por cinco segundos. "
         "Depois feche o olho e segure por três segundos.",
         12,
-        lambda b, a: a["reached_fechado"] or a["reached_glasses"],
-        "de óculos, o sistema detectou o olho fechado ou entrou no modo óculos",
-        "de óculos, o olho fechado não foi detectado e o modo óculos não ativou",
+        lambda b, a: a["reached_fechado"],
+        "de óculos, o olho fechado foi detectado e o alarme disparou",
+        "de óculos, o olho fechado não foi detectado",
     ),
 ]
 
@@ -622,9 +620,6 @@ def run_guided_self_test(source, landmarker, state, cv2, MpImage, MpImageFormat,
             ear_min = ear_max = None
             mar_min = mar_max = None
             pitch_min = pitch_max = None
-            eyes_dark_seen = False
-            dark_ratio_min = None  # menor eye_bright/face_bright visto (quanto
-                                     # menor, mais escura a região do olho ficou)
             # cabeça: tempo com a cabeça baixa, com cabeça baixa E olho
             # fechando (o que conta), maior episódio e tempo sem rosto
             cab_baixa_s = cab_conta_s = sem_rosto_s = cab_maior_s = 0.0
@@ -646,7 +641,7 @@ def run_guided_self_test(source, landmarker, state, cv2, MpImage, MpImageFormat,
                 if pf is not None:
                     st = state.update(
                         pf["left_ear"], pf["right_ear"], pf["mar"], pf["head_pitch"],
-                        pf["eyes_dark"], pf["face_detected"], t,
+                        pf["face_detected"], t,
                         jaw_open=pf["blendshapes"].get("jawOpen"), smile=core.sorriso(pf["blendshapes"]),
                     )
                     snapshot = {
@@ -654,7 +649,6 @@ def run_guided_self_test(source, landmarker, state, cv2, MpImage, MpImageFormat,
                         "yawn_count": st["yawn_count_recent"],
                         "head_down_count": st["head_down_count_recent"],
                         "reached_fechado": (after or {}).get("reached_fechado", False) or st["level"] == "fechado",
-                        "reached_glasses": (after or {}).get("reached_glasses", False) or st["modo_oculos_escuros"],
                         "reached_head_down": (after or {}).get("reached_head_down", False)
                         or (st.get("head_down_dur") or 0) >= core.HEAD_DOWN_SECONDS_ALERT,
                     }
@@ -677,11 +671,6 @@ def run_guided_self_test(source, landmarker, state, cv2, MpImage, MpImageFormat,
                     if st["head_pitch"] is not None:
                         pitch_min = st["head_pitch"] if pitch_min is None else min(pitch_min, st["head_pitch"])
                         pitch_max = st["head_pitch"] if pitch_max is None else max(pitch_max, st["head_pitch"])
-                    if pf["eyes_dark"]:
-                        eyes_dark_seen = True
-                    if pf["eye_bright"] is not None and pf["face_bright"] is not None and pf["face_bright"] > 0:
-                        ratio = pf["eye_bright"] / pf["face_bright"]
-                        dark_ratio_min = ratio if dark_ratio_min is None else min(dark_ratio_min, ratio)
 
                     if not headless and display_frame is not None:
                         disp = cv2.cvtColor(display_frame, cv2.COLOR_RGB2BGR)
@@ -704,9 +693,6 @@ def run_guided_self_test(source, landmarker, state, cv2, MpImage, MpImageFormat,
             ) + (
                 f"; cabeça baixa {cab_baixa_s:.1f}s, baixa com olho fechando {cab_conta_s:.1f}s, "
                 f"maior episódio {cab_maior_s:.1f}s, sem rosto {sem_rosto_s:.1f}s"
-            ) + f"; olho escuro visto: {'sim' if eyes_dark_seen else 'não'}" + (
-                f" (razão brilho olho/rosto mín: {dark_ratio_min:.2f}, limiar<{core.DARK_EYES_BRIGHTNESS_RATIO})"
-                if dark_ratio_min is not None else ""
             )
 
             if before is None or after is None:
@@ -795,7 +781,7 @@ def run_live_monitoring(source, landmarker, state, cv2, MpImage, MpImageFormat, 
 
             st = state.update(
                 pf["left_ear"], pf["right_ear"], pf["mar"], pf["head_pitch"],
-                pf["eyes_dark"], face_detected, t,
+                face_detected, t,
                 jaw_open=pf["blendshapes"].get("jawOpen"), smile=core.sorriso(pf["blendshapes"]),
             )
             perclos_value = st["perclos"]
@@ -883,8 +869,7 @@ def run_live_monitoring(source, landmarker, state, cv2, MpImage, MpImageFormat, 
             cv2.putText(
                 display,
                 f"PERCLOS(60s): {perclos_value*100:.0f}%  "
-                f"Piscadas longas(2min): {st['blink_count_recent']}"
-                + ("   [OCULOS ESCUROS]" if st["modo_oculos_escuros"] else ""),
+                f"Piscadas longas(2min): {st['blink_count_recent']}",
                 (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1,
             )
             mar_txt = f"{st['mar']:.3f}" if st["mar"] is not None else "-"

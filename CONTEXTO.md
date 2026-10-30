@@ -99,8 +99,9 @@ Para a fila longa não morrer ao fechar o terminal:
    - rosto de lado (3D e olho mais perto);
    - aviso de cabeça virada;
    - ajuste com sono real;
-   - óculos escuros;
    - pouca luz.
+   (Óculos escuros: resolvido pela luz infravermelha da câmera; o modo óculos
+   foi removido em 30/10/2026.)
 6. Monografia: Cap. 5 (Conclusão), Resumo, Abstract; tornar o GitHub público
    antes da banca.
 7. Hardware do carro: câmera NoIR + LEDs 850 nm, fonte veicular, suporte.

@@ -150,7 +150,7 @@ def test_low_peak_yawn_is_counted_by_state():
     state = core.DrowsinessState(ear_threshold=0.21, mar_threshold=0.55)
     t = 0.0
     for mar in [0.05] * 10 + [0.45] * 5 + [0.6] * 8 + [0.45] * 10 + [0.05] * 20:
-        st = state.update(0.3, 0.3, mar, None, None, True, t)
+        st = state.update(0.3, 0.3, mar, None, True, t)
         t += 0.1
     assert st["yawn_count_recent"] == 1
 
@@ -180,8 +180,8 @@ def test_perclos_tracker_ratio():
 
 def test_closed_eyes_trigger_full_alarm_after_threshold():
     state = core.DrowsinessState(ear_threshold=0.21, ear_almost_closed=0.26)
-    state.update(0.1, 0.1, None, None, None, True, 0.0)
-    st = state.update(0.1, 0.1, None, None, None, True, 2.0)
+    state.update(0.1, 0.1, None, None, True, 0.0)
+    st = state.update(0.1, 0.1, None, None, True, 2.0)
     assert st["level"] == "fechado"
 
 
@@ -189,8 +189,8 @@ def test_yawn_with_closed_eyes_never_triggers_full_alarm():
     """Bocejar fecha os olhos por reflexo — isso NUNCA pode disparar o
     alarme cheio de sono (só o aviso leve de fadiga)."""
     state = core.DrowsinessState(ear_threshold=0.21, mar_threshold=0.6)
-    state.update(0.1, 0.1, 0.8, None, None, True, 0.0)
-    st = state.update(0.1, 0.1, 0.8, None, None, True, 3.0)
+    state.update(0.1, 0.1, 0.8, None, True, 0.0)
+    st = state.update(0.1, 0.1, 0.8, None, True, 3.0)
     assert st["level"] != "fechado"
     assert st["level"] == "atencao"
     assert st["atencao_by_yawn"] is True
@@ -202,12 +202,12 @@ def test_eyes_closed_right_after_yawn_do_not_trigger_full_alarm():
     state = core.DrowsinessState(ear_threshold=0.21, mar_threshold=0.55)
     t = 0.0
     for _ in range(20):                      # bocejo de 2 s, olho fechado
-        state.update(0.1, 0.1, 0.8, None, None, True, t); t += 0.1
+        state.update(0.1, 0.1, 0.8, None, True, t); t += 0.1
     for _ in range(20):                      # boca fechou, olho segue fechado 2 s
-        st = state.update(0.1, 0.1, 0.05, None, None, True, t); t += 0.1
+        st = state.update(0.1, 0.1, 0.05, None, True, t); t += 0.1
         assert st["level"] != "fechado"
     for _ in range(30):                      # continua fechado: agora é sono
-        st = state.update(0.1, 0.1, 0.05, None, None, True, t); t += 0.1
+        st = state.update(0.1, 0.1, 0.05, None, True, t); t += 0.1
     assert st["level"] == "fechado"
 
 
@@ -215,29 +215,29 @@ def test_long_blink_is_counted_without_full_alarm():
     state = core.DrowsinessState(
         ear_threshold=0.21, ear_almost_closed=0.26, smoothing_window=1,
     )
-    state.update(0.1, 0.1, None, None, None, True, 0.0)      # olho fecha
-    st = state.update(0.3, 0.3, None, None, None, True, 0.9)  # reabre em 0.9s
+    state.update(0.1, 0.1, None, None, True, 0.0)      # olho fecha
+    st = state.update(0.3, 0.3, None, None, True, 0.9)  # reabre em 0.9s
     assert st["level"] != "fechado"
     assert st["blink_count_recent"] == 1
 
 
 def test_face_missing_triggers_distraction_only_after_threshold():
     state = core.DrowsinessState()
-    state.update(0.3, 0.3, None, None, None, True, 0.0)   # rosto visto
-    st = state.update(None, None, None, None, None, False, 1.0)
+    state.update(0.3, 0.3, None, None, True, 0.0)   # rosto visto
+    st = state.update(None, None, None, None, False, 1.0)
     assert st["distraido"] is False                        # sumiu há pouco
-    st = state.update(None, None, None, None, None, False, 0.0 + core.DISTRACTION_SECONDS + 0.1)
+    st = state.update(None, None, None, None, False, 0.0 + core.DISTRACTION_SECONDS + 0.1)
     assert st["distraido"] is True
-    st = state.update(0.3, 0.3, None, None, None, True, 5.0)
+    st = state.update(0.3, 0.3, None, None, True, 5.0)
     assert st["distraido"] is False                        # voltou a olhar
 
 
 def test_face_never_seen_or_gone_too_long_is_not_distraction():
     state = core.DrowsinessState()
-    st = state.update(None, None, None, None, None, False, 10.0)
+    st = state.update(None, None, None, None, False, 10.0)
     assert st["distraido"] is False                        # câmera ainda sem ninguém
-    state.update(0.3, 0.3, None, None, None, True, 20.0)
-    st = state.update(None, None, None, None, None, False, 20.0 + core.DISTRACTION_MAX_SECONDS + 1)
+    state.update(0.3, 0.3, None, None, True, 20.0)
+    st = state.update(None, None, None, None, False, 20.0 + core.DISTRACTION_MAX_SECONDS + 1)
     assert st["distraido"] is False                        # motorista saiu do carro
 
 
@@ -246,7 +246,7 @@ def test_perclos_escalates_level_even_with_eyes_open_now():
     # injeta histórico de olho majoritariamente fechado direto no tracker
     state.perclos_tracker.update(0.0, True)
     state.perclos_tracker.update(50.0, True)
-    st = state.update(0.35, 0.35, None, None, None, True, 50.1)  # olho aberto agora
+    st = state.update(0.35, 0.35, None, None, True, 50.1)  # olho aberto agora
     assert st["perclos"] >= core.PERCLOS_ALERT_RATIO
     assert st["level"] == "atencao"
     assert st["atencao_by_perclos"] is True
@@ -256,28 +256,11 @@ def test_perclos_needs_minimum_history_before_alerting():
     """Logo depois da calibração, uma piscada em poucos segundos de dados
     não pode virar 'PERCLOS alto'."""
     state = core.DrowsinessState(smoothing_window=1)
-    state.update(0.35, 0.35, None, None, None, True, 0.0)
-    state.update(0.10, 0.10, None, None, None, True, 1.0)    # piscada
-    st = state.update(0.35, 0.35, None, None, None, True, 1.3)
+    state.update(0.35, 0.35, None, None, True, 0.0)
+    state.update(0.10, 0.10, None, None, True, 1.0)    # piscada
+    st = state.update(0.35, 0.35, None, None, True, 1.3)
     assert st["perclos"] >= core.PERCLOS_ALERT_RATIO       # a conta dá alto...
     assert st["atencao_by_perclos"] is False               # ...mas não alerta ainda
-
-
-def test_glasses_mode_hysteresis_enter_and_exit():
-    state = core.DrowsinessState(smoothing_window=1)
-
-    # óculos escuros: olho lido como "fechado" pelo EAR bruto, mas o sinal
-    # de contraste diz que é lente escura, não sono
-    state.update(0.05, 0.05, None, None, True, True, 0.0)
-    st = state.update(0.05, 0.05, None, None, True, True, 3.5)  # >= 3s escuro
-    assert st["modo_oculos_escuros"] is True
-    assert st["level"] != "fechado"
-
-    # volta a enxergar o olho: precisa de 2s contínuos claros pra sair do modo
-    st = state.update(0.3, 0.3, None, None, False, True, 4.0)
-    assert st["modo_oculos_escuros"] is True  # ainda não passou os 2s
-    st = state.update(0.3, 0.3, None, None, False, True, 6.5)  # >= 2s claro
-    assert st["modo_oculos_escuros"] is False
 
 
 def test_calibration_discards_open_mouth_frames_and_keeps_the_yawn():
@@ -298,7 +281,7 @@ def test_calibration_discards_open_mouth_frames_and_keeps_the_yawn():
 def test_calibration_yawn_is_counted_by_state():
     state = core.DrowsinessState()
     state.registrar_bocejo(4.0)
-    st = state.update(0.3, 0.3, 0.02, None, None, True, 11.0)
+    st = state.update(0.3, 0.3, 0.02, None, True, 11.0)
     assert st["yawn_count_recent"] == 1
 
 
@@ -309,8 +292,8 @@ def test_head_down_with_eyes_open_is_not_drowsiness():
     cochilo = core.DrowsinessState(ear_threshold=0.21, ear_almost_closed=0.26, head_pitch_threshold=0.6)
     t = 0.0
     for _ in range(20):
-        a = olhando.update(0.3, 0.3, 0.02, 0.8, None, True, t)
-        b = cochilo.update(0.15, 0.15, 0.02, 0.8, None, True, t)
+        a = olhando.update(0.3, 0.3, 0.02, 0.8, True, t)
+        b = cochilo.update(0.15, 0.15, 0.02, 0.8, True, t)
         t += 0.1
     assert a["head_down"] is False and a["atencao_by_head"] is False
     assert b["head_down"] is True
@@ -320,7 +303,7 @@ def _fecha_olho(state, t, segundos, mar_de):
     """Olho fechado por `segundos` a 10 fps; mar_de(i) dá o MAR de cada frame."""
     st = None
     for i in range(int(segundos * 10)):
-        st = state.update(0.1, 0.1, mar_de(i), None, None, True, t + i / 10)
+        st = state.update(0.1, 0.1, mar_de(i), None, True, t + i / 10)
     return st
 
 
@@ -347,7 +330,7 @@ def test_yawn_with_lips_together_is_counted_by_jaw():
     state = core.DrowsinessState(ear_threshold=0.21, mar_threshold=0.55)
     t = 0.0
     for jaw in [0.01] * 10 + [0.45] * 5 + [0.8] * 20 + [0.45] * 5 + [0.01] * 20:   # 3 s de mandíbula aberta
-        st = state.update(0.3, 0.3, 0.05, None, None, True, t, jaw_open=jaw)
+        st = state.update(0.3, 0.3, 0.05, None, True, t, jaw_open=jaw)
         t += 0.1
     assert st["yawn_count_recent"] == 1
 
@@ -358,7 +341,7 @@ def test_short_jaw_openings_of_speech_are_not_yawns():
     t = 0.0
     for _ in range(8):
         for jaw in [0.05] * 5 + [0.7] * 12 + [0.05] * 5:   # 1,2 s aberta por frase
-            st = state.update(0.3, 0.3, 0.15, None, None, True, t, jaw_open=jaw)
+            st = state.update(0.3, 0.3, 0.15, None, True, t, jaw_open=jaw)
             t += 0.1
     assert st["yawn_count_recent"] == 0
 
@@ -367,7 +350,7 @@ def test_same_yawn_seen_by_lips_and_jaw_counts_once():
     state = core.DrowsinessState(ear_threshold=0.21, mar_threshold=0.55)
     t = 0.0
     for mar, jaw in [(0.05, 0.01)] * 10 + [(0.9, 0.9)] * 35 + [(0.05, 0.01)] * 30:
-        st = state.update(0.3, 0.3, mar, None, None, True, t, jaw_open=jaw)
+        st = state.update(0.3, 0.3, mar, None, True, t, jaw_open=jaw)
         t += 0.1
     assert st["yawn_count_recent"] == 1
 
@@ -387,11 +370,11 @@ def test_yawn_that_takes_the_face_out_of_frame_still_counts():
     state = core.DrowsinessState(ear_threshold=0.21, mar_threshold=0.55)
     t = 0.0
     for _ in range(10):
-        state.update(0.3, 0.3, 0.05, None, None, True, t); t += 0.1
+        state.update(0.3, 0.3, 0.05, None, True, t); t += 0.1
     for _ in range(15):                                   # 1,5 s de bocejo
-        state.update(0.3, 0.3, 0.9, None, None, True, t); t += 0.1
+        state.update(0.3, 0.3, 0.9, None, True, t); t += 0.1
     for _ in range(10):                                   # rosto some 1 s
-        st = state.update(None, None, None, None, None, False, t); t += 0.1
+        st = state.update(None, None, None, None, False, t); t += 0.1
     assert st["yawn_count_recent"] == 1
 
 
@@ -402,9 +385,9 @@ def test_head_drop_survives_flicker_of_the_closed_eye():
     t = 0.0
     for i in range(20):                                   # 2 s, olho "pisca" a cada 5 frames
         ear = 0.30 if i % 5 == 4 else 0.10
-        state.update(ear, ear, 0.02, 0.8, None, True, t); t += 0.1
+        state.update(ear, ear, 0.02, 0.8, True, t); t += 0.1
     for _ in range(10):                                   # cabeça sobe, olho abre
-        st = state.update(0.30, 0.30, 0.02, 0.4, None, True, t); t += 0.1
+        st = state.update(0.30, 0.30, 0.02, 0.4, True, t); t += 0.1
     assert st["head_down_count_recent"] == 1
 
 
@@ -412,9 +395,9 @@ def test_head_drop_that_takes_the_face_out_of_frame_still_counts():
     state = core.DrowsinessState(ear_threshold=0.21, ear_almost_closed=0.26, head_pitch_threshold=0.6)
     t = 0.0
     for _ in range(15):                                   # 1,5 s caindo, olho fechado
-        state.update(0.10, 0.10, 0.02, 0.8, None, True, t); t += 0.1
+        state.update(0.10, 0.10, 0.02, 0.8, True, t); t += 0.1
     for _ in range(10):                                   # rosto some
-        st = state.update(None, None, None, None, None, False, t); t += 0.1
+        st = state.update(None, None, None, None, False, t); t += 0.1
     assert st["head_down_count_recent"] == 1
 
 
@@ -424,11 +407,11 @@ def test_head_that_falls_out_of_frame_counts_even_if_visible_part_is_short():
     state = core.DrowsinessState(ear_threshold=0.21, ear_almost_closed=0.26, head_pitch_threshold=0.6)
     t = 0.0
     for _ in range(10):
-        state.update(0.30, 0.30, 0.02, 0.4, None, True, t); t += 0.1
+        state.update(0.30, 0.30, 0.02, 0.4, True, t); t += 0.1
     for _ in range(3):                                    # 0,3 s caindo de olho fechado
-        state.update(0.10, 0.10, 0.02, 0.8, None, True, t); t += 0.1
+        state.update(0.10, 0.10, 0.02, 0.8, True, t); t += 0.1
     for _ in range(10):
-        st = state.update(None, None, None, None, None, False, t); t += 0.1
+        st = state.update(None, None, None, None, False, t); t += 0.1
     assert st["head_down_count_recent"] == 1
 
 
@@ -438,9 +421,9 @@ def test_face_lost_without_head_drop_is_not_a_head_drop():
     state = core.DrowsinessState(ear_threshold=0.21, ear_almost_closed=0.26, head_pitch_threshold=0.6)
     t = 0.0
     for _ in range(10):
-        state.update(0.30, 0.30, 0.02, 0.4, None, True, t); t += 0.1
+        state.update(0.30, 0.30, 0.02, 0.4, True, t); t += 0.1
     for _ in range(10):
-        st = state.update(None, None, None, None, None, False, t); t += 0.1
+        st = state.update(None, None, None, None, False, t); t += 0.1
     assert st["head_down_count_recent"] == 0
 
 
@@ -477,7 +460,7 @@ def test_smile_gives_closed_eyes_the_same_extra_time_as_talking():
         state = core.DrowsinessState(ear_threshold=0.21, smile_baseline=0.05)
         t = 0.0
         while t < 4.0:
-            st = state.update(0.1, 0.1, 0.02, None, None, True, t, smile=smile)
+            st = state.update(0.1, 0.1, 0.02, None, True, t, smile=smile)
             if st["level"] == "fechado":
                 return t
             t += 0.1
@@ -490,15 +473,15 @@ def test_smile_rule_is_off_without_calibrated_neutral():
     """Sem o neutro da calibração não dá pra saber se é sorriso ou o formato
     da boca da pessoa: a regra fica desligada."""
     state = core.DrowsinessState(ear_threshold=0.21)
-    state.update(0.1, 0.1, 0.02, None, None, True, 0.0, smile=0.9)
-    st = state.update(0.1, 0.1, 0.02, None, None, True, 2.0, smile=0.9)
+    state.update(0.1, 0.1, 0.02, None, True, 0.0, smile=0.9)
+    st = state.update(0.1, 0.1, 0.02, None, True, 2.0, smile=0.9)
     assert st["level"] == "fechado"
 
 
 def test_long_blink_while_laughing_is_not_counted():
     state = core.DrowsinessState(ear_threshold=0.21, smoothing_window=1, smile_baseline=0.05)
-    state.update(0.1, 0.1, 0.02, None, None, True, 0.0, smile=0.6)
-    st = state.update(0.3, 0.3, 0.02, None, None, True, 0.9, smile=0.6)
+    state.update(0.1, 0.1, 0.02, None, True, 0.0, smile=0.6)
+    st = state.update(0.3, 0.3, 0.02, None, True, 0.9, smile=0.6)
     assert st["blink_count_recent"] == 0
 
 
@@ -517,10 +500,10 @@ def test_closed_eyes_while_yawning_do_not_raise_perclos():
     state = core.DrowsinessState(ear_threshold=0.21, mar_threshold=0.55)
     t = 0.0
     while t < 5.0:
-        st = state.update(0.05, 0.05, 0.8, None, None, True, t); t += 0.1
+        st = state.update(0.05, 0.05, 0.8, None, True, t); t += 0.1
     assert st["perclos"] == 0.0
     while t < 10.0:
-        st = state.update(0.05, 0.05, 0.02, None, None, True, t); t += 0.1
+        st = state.update(0.05, 0.05, 0.02, None, True, t); t += 0.1
     assert st["perclos"] > 0.0
 
 

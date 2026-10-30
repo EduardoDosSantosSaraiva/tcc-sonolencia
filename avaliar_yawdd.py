@@ -123,7 +123,7 @@ def _extrair(path, destino):
                            nan if pf["right_ear"] is None else pf["right_ear"],
                            nan if pf["mar"] is None else pf["mar"],
                            nan if pf["head_pitch"] is None else pf["head_pitch"],
-                           nan if pf["eyes_dark"] is None else float(pf["eyes_dark"]),
+                           nan,  # 5: era o modo óculos (removido em 30/10/2026); vazia pra manter as colunas
                            float(pf["face_detected"]),
                            # colunas 7 e 8: medidas de boca em estudo, fora da decisão
                            nan if pf["abertura_boca"] is None else pf["abertura_boca"],
@@ -131,10 +131,10 @@ def _extrair(path, destino):
                            # 9: nariz-queixo; 10 em diante: blendshapes, na ordem de core.BLENDSHAPES_USADOS
                            nan if pf["queixo"] is None else pf["queixo"],
                            *(pf["blendshapes"].get(n, nan) for n in core.BLENDSHAPES_USADOS),
-                           # 24 a 28, em estudo (rosto de lado e óculos): EAR esq/dir e MAR
-                           # em 3D, ângulo do rosto (graus) e razão de brilho olho/rosto
+                           # 24 a 27, em estudo (rosto de lado): EAR esq/dir e MAR em 3D e
+                           # ângulo do rosto (graus); 28 era a razão de brilho do modo óculos
                            *(nan if pf[k] is None else pf[k] for k in ("left_ear3d", "right_ear3d", "mar3d", "yaw")),
-                           nan if not (pf["eye_bright"] and pf["face_bright"]) else pf["eye_bright"] / pf["face_bright"]))
+                           nan))
     finally:
         landmarker.close()
         source.close()
@@ -196,10 +196,10 @@ def simular(serie, eventos=None):
     mar_max = 0.0
     prev = {"fechado": False, "bocejos": 0, "piscadas": 0, "cabeca": 0}
     t = t0
-    for (t, l, r, m, p, d, face), j, sr in zip(serie[i:], jaw[i:], sorriso[i:]):
+    for (t, l, r, m, p, _d, face), j, sr in zip(serie[i:], jaw[i:], sorriso[i:]):
         frames += 1
         com_rosto += bool(face)
-        st = state.update(_v(l), _v(r), _v(m), _v(p), None if d != d else bool(d), bool(face), t,
+        st = state.update(_v(l), _v(r), _v(m), _v(p), bool(face), t,
                           jaw_open=_v(j), smile=_v(sr))
         if st["mar"] is not None:
             mar_max = max(mar_max, st["mar"])

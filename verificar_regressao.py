@@ -134,7 +134,7 @@ def medir_alarmes_reais():
                 episodios.append((inicio, t))
                 inicio = None
             rosto = l is not None and r is not None
-            st = state.update(l, r, m, p, None, rosto, t)
+            st = state.update(l, r, m, p, rosto, t)
             if st["level"] == "fechado":
                 disparos.append(t)
         if inicio is not None:

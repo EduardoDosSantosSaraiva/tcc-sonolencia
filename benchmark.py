@@ -166,7 +166,7 @@ def main():
             pf = ef.process_frame(landmarker, timestamp, MpImage, MpImageFormat, infer_frame, iw, ih, t_video)
             if pf is None:
                 continue
-            state.update(pf["left_ear"], pf["right_ear"], pf["mar"], pf["head_pitch"], pf["eyes_dark"],
+            state.update(pf["left_ear"], pf["right_ear"], pf["mar"], pf["head_pitch"],
                          pf["face_detected"], t_video, jaw_open=pf["blendshapes"].get("jawOpen"),
                          smile=core.sorriso(pf["blendshapes"]))
             total_ms = (time.perf_counter() - t0) * 1000

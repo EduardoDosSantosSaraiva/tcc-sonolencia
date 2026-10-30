@@ -34,9 +34,11 @@ Decisões de projeto que valem destaque:
 - **O alarme toca até o fim.** Se o condutor reabre os olhos no meio do áudio, o
   som não é interrompido — a função dele é acordar de verdade, não reagir ao
   estado instantâneo.
-- **Modo óculos escuros.** Comparando o brilho da região dos olhos com o do resto
-  do rosto (com histerese), o sistema detecta lente escura e desativa o EAR,
-  passando a decidir por boca e cabeça. Funciona também com lentes polarizadas.
+- **Óculos escuros.** A luz infravermelha da câmera atravessa a lente (escura ou
+  polarizada), então o olho continua medido pelo EAR e o microssono dispara
+  igual. Um modo que desligava o EAR com a região do olho escura existiu até
+  30/10/2026 e foi removido: com infravermelho ele não era necessário e podia
+  ligar sozinho num olho fechado, desligando o alarme principal.
 - **Seleção do condutor.** Com até três rostos no quadro, o sistema acompanha o
   maior (mais próximo da câmera), ignorando passageiros.
 
