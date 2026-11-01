@@ -52,6 +52,7 @@ CSS = """
  .capa{text-align:center}
  .capa h1,.capa h2{text-align:center;margin:1.6em 0;page-break-after:auto}
  .capa p{text-indent:0}
+ .capa.resumo p{text-indent:1.22cm;text-align:justify}   /* como no modelo: corpo justificado, recuo 1,22 cm */
  .folha-capa{position:relative;height:700pt;page-break-after:always}
  .folha-capa div{position:absolute;left:0;right:0;text-align:center;text-indent:0;margin:0}
  .c-inst{top:0}
@@ -193,7 +194,8 @@ def main():
         # nas folhas pré-textuais cada bloco separado por --- é uma página
         for pagina in re.split(r"<hr>", corpo(AQUI / "00_pre_textual.html")):
             if pagina.strip():
-                partes.append(f'<div class="pagina capa">{pagina}</div>')
+                resumo = " resumo" if re.search(r"<h1[^>]*>\s*(Resumo|Abstract)", pagina) else ""
+                partes.append(f'<div class="pagina capa{resumo}">{pagina}</div>')
     else:
         partes.append(capa())
 

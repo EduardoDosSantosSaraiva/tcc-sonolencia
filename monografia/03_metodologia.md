@@ -4,7 +4,7 @@ Este trabalho caracteriza-se como pesquisa aplicada, com desenvolvimento de um p
 
 ## 3.1 Hardware e software
 
-O protótipo é formado por um Raspberry Pi 5 com 4 GB de memória, um módulo de câmera com sensor OmniVision OV5647 de 5 megapixels conectado à interface MIPI, um fone de ouvido Bluetooth (Lenovo ThinkPlus GM2 Pro) para os alertas sonoros, uma tela sensível ao toque ligada ao barramento SPI e um *buzzer* ativo, ligado ao pino GPIO26, que serve de alarme de reserva. A Figura 1 apresenta a arquitetura do sistema, com as etapas numeradas na ordem em que cada quadro as percorre.
+O protótipo é formado por um Raspberry Pi 5 com 4 GB de memória; um módulo de câmera com sensor OmniVision OV5647 de 5 megapixels, conectado à interface MIPI, sem filtro de infravermelho e com dois LEDs infravermelhos que se acendem automaticamente quando a luz ambiente diminui, recurso usado para contornar o desempenho ruim das câmeras comuns à noite²⁰; um dispositivo de áudio Bluetooth, fone de ouvido ou caixa de som, para os alertas sonoros; uma tela sensível ao toque ligada ao barramento SPI; e um *buzzer* ativo, ligado ao pino GPIO26, que serve de alarme de reserva. A Figura 1 apresenta a arquitetura do sistema, com as etapas numeradas na ordem em que cada quadro as percorre.
 
 ::: Figura 1: arquitetura do sistema
 
@@ -21,8 +21,7 @@ A cada quadro capturado, a imagem de 640 × 480 pixels é enviada ao *Face Landm
 - o EAR de cada olho, pela Equação 1, com os pontos 33, 160, 158, 133, 153 e 144 da malha (olho direito) e 362, 385, 387, 263, 373 e 380 (olho esquerdo);
 - o MAR, pela Equação 3, com os pontos 61, 82, 312, 291, 317 e 87 do contorno interno dos lábios;
 - os coeficientes *jawOpen* (abertura da mandíbula) e *mouthSmileLeft* e *mouthSmileRight* (sorriso), entre os *blendshapes* devolvidos pelo modelo;
-- um índice de queda da cabeça, descrito a seguir;
-- a razão entre o brilho médio da região dos olhos e o brilho médio do rosto, usada para detectar óculos escuros.
+- um índice de queda da cabeça, descrito a seguir.
 
 O índice de queda da cabeça *H* é a altura da ponta do nariz abaixo da linha dos olhos, normalizada pela distância entre os olhos, conforme a Equação 4, em que *y*~nariz~ é a coordenada vertical da ponta do nariz, *ȳ*~olhos~ é a média vertical dos doze pontos dos olhos e *d*~io~ é a distância tridimensional entre os centros dos dois olhos.
 
@@ -36,7 +35,7 @@ As medidas brutas oscilam de um quadro para outro por ruído de rastreamento. Po
 
 Como o EAR de olho aberto, a abertura da boca em repouso e a posição natural da cabeça variam de pessoa para pessoa¹⁹, os limiares do sistema não são fixos: são derivados de uma calibração feita sempre que o sistema é ligado. A calibração nunca é reaproveitada de uma sessão anterior, porque a iluminação, o ângulo de montagem da câmera e a postura do condutor mudam de um dia para outro.
 
-Ao ligar, uma mensagem de voz avisa que a calibração começará em três segundos e pede que o condutor se sente como se estivesse dirigindo. Em seguida, o sistema coleta cinco segundos de quadros com o rosto em repouso. Quadros com a boca ou a mandíbula abertas, como os de quem fala ou boceja nesse momento, são descartados, e a coleta se estende automaticamente, até o máximo de dez segundos, para completar os cinco segundos válidos. Um bocejo ocorrido durante a calibração não é ignorado: ele entra na contagem de bocejos da sessão, já que quem boceja ao ligar o sistema já está cansado. A referência de cada medida é a mediana dos quadros válidos, exigindo-se no mínimo 20 amostras.
+Ao ligar, o sistema primeiro espera que o rosto do condutor apareça na câmera, com os dois olhos visíveis por um segundo seguido; se ninguém aparecer em dois segundos, avisa por voz que está aguardando o motorista. Essa espera evita calibrar o banco vazio quando o equipamento é ligado antes de o condutor se sentar. Em seguida, uma mensagem de voz avisa que a calibração começará em três segundos e pede que o condutor se sente como se estivesse dirigindo. Em seguida, o sistema coleta cinco segundos de quadros com o rosto em repouso. Quadros com a boca ou a mandíbula abertas, como os de quem fala ou boceja nesse momento, são descartados, e a coleta se estende automaticamente, até o máximo de dez segundos, para completar os cinco segundos válidos. Um bocejo ocorrido durante a calibração não é ignorado: ele entra na contagem de bocejos da sessão, já que quem boceja ao ligar o sistema já está cansado. A referência de cada medida é a mediana dos quadros válidos, exigindo-se no mínimo 20 amostras.
 
 Duas verificações protegem contra uma calibração ruim. A primeira exige que o EAR de referência fique entre 0,15 e 0,45, faixa fora da qual a medida indica rosto mal detectado. A segunda compara o EAR obtido com a mediana das últimas dez calibrações bem-sucedidas: um desvio superior a 20%, geralmente causado por olhos arregalados ou postura incomum, faz o sistema explicar o problema por voz e repetir a calibração, em até três tentativas. Na última tentativa, um EAR diferente do histórico é aceito, pois pode tratar-se simplesmente de outro condutor; apenas se os olhos não forem encontrados o sistema passa a usar limiares padrão, avisando o condutor por voz. O Quadro 1 resume como cada limiar é derivado das referências calibradas.
 
@@ -67,7 +66,7 @@ O bocejo é detectado por dois caminhos independentes, ambos com histerese: um e
 
 A queda da cabeça é contada quando o índice *H* fica acima do limiar por pelo menos um segundo, tolerando oscilações de até 0,5 segundo, e somente se, ao mesmo tempo, os olhos estiverem semicerrados ou fechados. Essa exigência distingue o cochilo, em que a cabeça pende enquanto os olhos se fecham, do condutor que apenas olha para o painel ou para o rádio. Como uma queda real costuma tirar o rosto do campo da câmera, o desaparecimento do rosto até um segundo após um quadro de cabeça baixa com olhos se fechando também conta como queda. Uma queda sustentada, ou duas quedas em dois minutos, elevam o nível para atenção.
 
-Duas condições adversas recebem tratamento próprio. Quando a razão de brilho entre olhos e rosto fica abaixo de 0,70 por três segundos, o sistema entra no modo de óculos escuros, no qual o EAR deixa de ser considerado, por não ser confiável através de uma lente escura, e a decisão passa a depender da boca e da cabeça, sendo a queda da cabeça aceita mesmo sem a confirmação dos olhos. O modo é desativado após dois segundos de razão normal, e a medida é ignorada quando o rosto inteiro está escuro demais, com brilho médio abaixo de 25 em uma escala de 0 a 255. A outra condição é a ausência do rosto: falhas de até 0,5 segundo são toleradas sem perder o estado; após três segundos sem rosto, depois de ele já ter sido visto, o sistema considera que o condutor desviou o olhar da via (a 80 km/h, cerca de 67 metros percorridos) e emite um aviso de distração, até o limite de 60 segundos, a partir do qual assume que o condutor deixou o banco.
+O uso de óculos escuros não recebe tratamento à parte: a decisão continua baseada no EAR, e o cenário 8 do protocolo de testes (Seção 3.6) verifica se o olho fechado continua sendo detectado através da lente. Uma versão anterior do sistema deixava de considerar o EAR quando a região dos olhos ficava escura em relação ao resto do rosto; ela foi removida pelos motivos discutidos na Seção 4.2. A condição adversa que recebe tratamento próprio é a ausência do rosto: falhas de até 0,5 segundo são toleradas sem perder o estado; após três segundos sem rosto, depois de ele já ter sido visto, o sistema considera que o condutor desviou o olhar da via (a 80 km/h, cerca de 67 metros percorridos) e emite um aviso de distração, até o limite de 60 segundos, a partir do qual assume que o condutor deixou o banco.
 
 ## 3.5 Alertas sonoros e registro
 
@@ -84,13 +83,13 @@ Cada categoria de sinal tem um alerta próprio, com mensagem de voz distinta, pa
 
 ::: Fonte: autoria própria
 
-O alarme de sono, uma vez iniciado, toca até o fim mesmo que os olhos se reabram no meio da reprodução. A decisão foi tomada após um teste ao vivo: interromper o som no instante em que o olho se abre permitia silenciar o alarme com uma piscada, sem que o condutor estivesse de fato desperto. Os alertas tocam no fone Bluetooth, e um monitor verifica a cada três segundos se o fone continua sendo a saída de som ativa. Se ele se desconectar, por bateria ou alcance, o sistema avisa por voz na saída seguinte e passa a acionar também o *buzzer* de reserva, por oito segundos, junto com o alarme de sono e o aviso de distração.
+O alarme de sono, uma vez iniciado, toca até o fim mesmo que os olhos se reabram no meio da reprodução. A decisão foi tomada após um teste ao vivo: interromper o som no instante em que o olho se abre permitia silenciar o alarme com uma piscada, sem que o condutor estivesse de fato desperto. Os alertas tocam no dispositivo de áudio Bluetooth, e um monitor verifica a cada três segundos se ele continua sendo a saída de som ativa. Se ele se desconectar, por bateria ou alcance, o sistema avisa por voz na saída seguinte e passa a acionar também o *buzzer* de reserva, por oito segundos, junto com o alarme de sono e o aviso de distração.
 
 Durante o monitoramento, o sistema grava no banco SQLite, quadro a quadro, apenas valores numéricos: EAR, MAR, índice da cabeça, PERCLOS, contagens de eventos, nível de alerta e tempo de processamento. Para servir de evidência na avaliação, o quadro do instante de cada alarme de sono é salvo como imagem no próprio dispositivo; essas imagens nunca saem dele e ficam fora do controle de versão, por constituírem dado biométrico nos termos da LGPD¹⁴.
 
 ## 3.6 Protocolo de testes guiados
 
-Para validar o sistema com o próprio condutor, foi criado um modo de autoteste guiado por voz, que conduz oito cenários controlados, um de cada vez, e avalia cada um automaticamente pelo critério do Quadro 3. Ao final, gera um relatório com o resultado e com a telemetria de cada cenário (valores mínimos e máximos de EAR, MAR e índice da cabeça, tempo de cabeça baixa, tempo sem rosto e razão de brilho dos olhos), o que permite diagnosticar uma falha sem repetir o teste. O mesmo modo serve de demonstração do funcionamento do sistema. Os testes foram realizados pelos próprios autores, sem participação de terceiros.
+Para validar o sistema com o próprio condutor, foi criado um modo de autoteste guiado por voz, que conduz oito cenários controlados, um de cada vez, e avalia cada um automaticamente pelo critério do Quadro 3. Ao final, gera um relatório com o resultado e com a telemetria de cada cenário (valores mínimos e máximos de EAR, MAR e índice da cabeça, tempo de cabeça baixa e tempo sem rosto), o que permite diagnosticar uma falha sem repetir o teste. O mesmo modo serve de demonstração do funcionamento do sistema. Os testes foram realizados pelos próprios autores, sem participação de terceiros.
 
 ::: Quadro 3: cenários do protocolo de testes guiados
 
@@ -103,11 +102,11 @@ Para validar o sistema com o próprio condutor, foi criado um modo de autoteste 
 | 5. Fala normal | falar naturalmente por 15 s | nenhum bocejo contado |
 | 6. Bocejo real | bocejar, podendo fechar os olhos | bocejo contado, sem alarme de sono |
 | 7. Cabeça caindo | fechar os olhos e deixar a cabeça pender por 2 s | queda da cabeça contada |
-| 8. Óculos | com óculos escuros ou polarizados, olhar 5 s e fechar os olhos por 3 s | olho fechado detectado ou modo de óculos ativado |
+| 8. Óculos | com óculos escuros ou polarizados, olhar 5 s e fechar os olhos por 3 s | alarme de sono disparado |
 
 ::: Fonte: autoria própria
 
-O critério do cenário 8 aceita dois resultados porque ambos são seguros: com lente polarizada, o olho continua visível e o alarme de sono deve disparar normalmente; com lente escura, o sistema deve reconhecer que não enxerga o olho e passar a vigiar a boca e a cabeça. Falha apenas se nenhum dos dois ocorrer.
+O cenário 8 tem o mesmo critério do microssono porque os óculos não mudam o que o sistema precisa fazer: se o condutor fecha os olhos, o alarme de sono deve disparar, com ou sem lente.
 
 ## 3.7 Avaliação em base pública, testes automatizados e desempenho
 
@@ -117,9 +116,9 @@ Cada vídeo é processado com o mesmo código do programa ao vivo: os primeiros 
 
 Como parte dos limiares de bocejo foi ajustada observando os próprios vídeos da YawDD, o resultado nesses vídeos tende a ser otimista. Para estimar o desempenho em pessoas que o ajuste não viu, foi feita uma validação cruzada por participante em cinco dobras: os participantes são divididos em cinco grupos, mantendo todos os vídeos de uma mesma pessoa no mesmo grupo; para cada grupo, os quatro parâmetros do bocejo são escolhidos, entre 81 combinações, usando apenas os outros quatro grupos, e o desempenho é medido no grupo deixado de fora.
 
-A lógica de decisão é coberta por 42 testes automatizados, escritos com a biblioteca pytest, que alimentam a máquina de estados com sequências sintéticas de medidas e verificam o comportamento esperado em cada situação, como a piscada longa, o bocejo de olhos fechados e a queda da cabeça que tira o rosto do quadro. Complementarmente, um teste de regressão reaplica as regras atuais aos 349 vídeos da YawDD e aos 80 episódios de alarme de sono registrados nas sessões ao vivo durante o desenvolvimento, e acusa qualquer piora em relação a uma referência salva. Esse segundo conjunto protege contra uma regra nova que reduza alarmes falsos à custa de esconder um fechamento de olhos real.
+A lógica de decisão é coberta por 44 testes automatizados, escritos com a biblioteca pytest, que alimentam a máquina de estados com sequências sintéticas de medidas e verificam o comportamento esperado em cada situação, como a piscada longa, o bocejo de olhos fechados e a queda da cabeça que tira o rosto do quadro. Complementarmente, um teste de regressão reaplica as regras atuais aos 349 vídeos da YawDD e aos 86 episódios de alarme de sono registrados nas sessões ao vivo durante o desenvolvimento, e acusa qualquer piora em relação a uma referência salva. Esse segundo conjunto protege contra uma regra nova que reduza alarmes falsos à custa de esconder um fechamento de olhos real.
 
-Por fim, o desempenho na plataforma-alvo foi medido por uma ferramenta própria, que processa um vídeo da YawDD na maior velocidade possível e registra, quadro a quadro, o tempo gasto apenas pelo MediaPipe e o tempo total do quadro até a decisão, com média, mediana e percentis de 95% e 99%. A cada dez segundos são registrados também a taxa de quadros, o uso de processador, a temperatura, a frequência de operação do processador e o registro de subtensão e de redução de velocidade do Raspberry Pi. Além de uma medição curta, foi realizado um teste de resistência de 60 minutos contínuos, que repete o vídeo para verificar se o desempenho se mantém com o aquecimento da placa.
+Por fim, o desempenho na plataforma-alvo foi medido por uma ferramenta própria, que processa um vídeo da YawDD na maior velocidade possível e registra, quadro a quadro, o tempo gasto apenas pelo MediaPipe e o tempo total do quadro até a decisão, com média, mediana e percentis de 95% e 99%. A cada dez segundos são registrados também a taxa de quadros, o uso de processador, a temperatura, a frequência de operação do processador e o registro de subtensão e de redução de velocidade do Raspberry Pi. Além de uma medição curta, foi realizado um teste de resistência de 20 minutos contínuos, que repete o vídeo para verificar se o desempenho se mantém com o aquecimento da placa.
 
 ---
 

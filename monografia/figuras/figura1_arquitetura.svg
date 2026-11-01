@@ -29,9 +29,9 @@
 
   <g text-anchor="middle">
     <text x="57" y="68" font-weight="bold" font-size="13">Câmera</text>
-    <text x="57" y="86">OV5647</text>
+    <text x="57" y="86">OV5647 NoIR</text>
     <text x="57" y="102">MIPI CSI</text>
-    <text x="57" y="164" font-weight="bold" font-size="13">Fone</text>
+    <text x="57" y="164" font-weight="bold" font-size="13">Áudio</text>
     <text x="57" y="180">Bluetooth</text>
     <text x="57" y="222" font-weight="bold" font-size="13">Buzzer</text>
     <text x="57" y="238">(reserva)</text>
@@ -48,7 +48,7 @@
 
     <text x="600" y="66" font-weight="bold" font-size="13">3. Medidas</text>
     <text x="600" y="84">EAR, MAR, jawOpen,</text>
-    <text x="600" y="100">sorriso, H e brilho</text>
+    <text x="600" y="100">sorriso e índice H</text>
 
     <text x="600" y="170" font-weight="bold" font-size="13">4. Suavização</text>
     <text x="600" y="188">mediana de 3 quadros</text>
@@ -79,7 +79,7 @@
     <path d="M600,112 V146" marker-end="url(#seta)"/>
     <path d="M520,181 H496" marker-end="url(#seta)"/>
     <path d="M336,181 H312" marker-end="url(#seta)"/>
-    <!-- saídas: fone, buzzer e tela -->
+    <!-- saídas: áudio, buzzer e tela -->
     <path d="M152,181 H126"/>
     <path d="M126,167 V283"/>
     <path d="M126,167 H110" marker-end="url(#seta)"/>
