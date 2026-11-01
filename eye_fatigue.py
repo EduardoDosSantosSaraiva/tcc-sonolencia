@@ -20,6 +20,7 @@ Requer o modelo face_landmarker.task na mesma pasta (ver core.build_landmarker).
 
 import argparse
 import hashlib
+import json
 import os
 import shutil
 import subprocess
@@ -193,9 +194,10 @@ class AudioOutputMonitor:
     fone desconectar (bateria, alcance), o PipeWire passa a tocar na saída
     seguinte (HDMI/alto-falante) sozinho; o monitor avisa por voz, marca
     fone_ok=False pro loop principal ligar o buzzer reserva e mostrar o aviso
-    na tela. Só vigia se o programa começou com fone: sem fone desde o início
-    não há o que perder. Roda numa thread porque o wpctl leva alguns ms e o
-    loop de detecção não pode esperar."""
+    na tela. Vigia também quando o programa começa sem fone: no boot a caixa
+    Bluetooth costuma conectar depois que o monitoramento já abriu, e aí os
+    alarmes passam para ela e o aviso de fone caído sai da tela. Roda numa
+    thread porque o wpctl leva alguns ms e o loop de detecção não pode esperar."""
 
     INTERVAL_SECONDS = 3.0
 
@@ -203,10 +205,11 @@ class AudioOutputMonitor:
         self.player = player
         self.fone_ok = self._fone_conectado()
         self._parar = threading.Event()
-        if self.fone_ok:
+        if self.fone_ok is not None:
             threading.Thread(target=self._loop, daemon=True).start()
-        elif self.fone_ok is False:
-            print("Aviso: a saída de som não é um fone Bluetooth; alarmes tocam na saída padrão.")
+        if self.fone_ok is False:
+            print("Aviso: a saída de som não é um fone Bluetooth; alarmes tocam na saída padrão"
+                  " até um fone conectar.")
 
     @staticmethod
     def _fone_conectado():
@@ -344,6 +347,134 @@ def build_source(args):
         sys.exit(1)
 
 
+def pick_screen():
+    """(nome, x, y, largura, altura) da tela onde a janela abre, em
+    coordenadas do layout do Wayland: a saída escolhida em TCC_TELA (ex.:
+    TCC_TELA=SPI-1 para testar a telinha com o HDMI ligado) ou a maior tela
+    ligada. None se não deu pra consultar (sessão X11, sem wlr-randr)."""
+    try:
+        out = subprocess.run(["wlr-randr", "--json"], capture_output=True, text=True, timeout=3).stdout
+        telas = []
+        for o in json.loads(out):
+            modo = next((m for m in o.get("modes", []) if m.get("current")), None)
+            if not o.get("enabled") or not modo:
+                continue
+            escala = o.get("scale") or 1.0
+            w, h = modo["width"] / escala, modo["height"] / escala
+            if "90" in str(o.get("transform", "")) or "270" in str(o.get("transform", "")):
+                w, h = h, w
+            telas.append((o["name"], int(o["position"]["x"]), int(o["position"]["y"]), int(w), int(h)))
+    except Exception:
+        return None
+    pedida = os.environ.get("TCC_TELA")
+    for t in telas:
+        if t[0] == pedida:
+            return t
+    return max(telas, key=lambda t: t[3] * t[4]) if telas else None
+
+
+def fit_to_screen(cv2, img, w, h):
+    """Reduz a imagem para caber em w x h sem distorcer e completa com preto.
+    INTER_LINEAR: 0,85 ms por quadro de 1296x972 no Pi 5, contra 4,2 ms do
+    INTER_AREA (medido em 01/11/2026), num laço que já usa ~25 de 33 ms."""
+    ih, iw = img.shape[:2]
+    if (iw, ih) == (w, h):   # a interface já desenha no tamanho da telinha
+        return img
+    f = min(w / iw, h / ih)
+    nw, nh = max(1, int(iw * f)), max(1, int(ih * f))
+    img = cv2.resize(img, (nw, nh), interpolation=cv2.INTER_LINEAR)
+    top, left = (h - nh) // 2, (w - nw) // 2
+    return cv2.copyMakeBorder(img, top, h - nh - top, left, w - nw - left, cv2.BORDER_CONSTANT, value=0)
+
+
+_window_placed = False
+_small_screen = None   # (w, h) quando a tela é menor que a imagem
+UI = None              # interface.Interface: as telas do programa (None sem tela)
+
+
+def tecla(cv2):
+    """cv2.waitKey(1) que também trata as teclas da interface: D liga e
+    desliga os dados técnicos (no carro, um toque na tela faz o mesmo)."""
+    k = cv2.waitKey(1) & 0xFF
+    if k in (ord("d"), ord("D")) and UI is not None:
+        UI.tecnico = not UI.tecnico
+    return k
+
+
+def _clique(evento, _x, _y, _flags, _param):
+    if evento == 4 and UI is not None:   # cv2.EVENT_LBUTTONUP; o toque na telinha vira clique
+        UI.tecnico = not UI.tecnico
+
+
+def mostrar_mensagem(cv2, headless, titulo, texto, tipo="info", etapa=1):
+    """Põe um cartão na tela antes de uma fala: a fala trava o laço, e sem
+    isso a janela ficava parada no último quadro, sem dizer o que acontecia."""
+    if headless or UI is None:
+        return
+    show_frame(cv2, UI.mensagem(titulo, texto, tipo, etapa))
+    cv2.waitKey(1)
+
+
+def show_frame(cv2, img):
+    """cv2.imshow na janela do programa, aberta na tela certa. Sem posição, o
+    labwc abria a janela na tela SPI de 3,5" (480x320, à esquerda do monitor
+    HDMI), espremida, e no boot parecia que o programa não tinha aberto.
+    - Tela que comporta a imagem (monitor HDMI, nos testes): janela no
+      tamanho natural, centralizada.
+    - Tela menor que a imagem (a telinha, no carro): a imagem é reduzida para
+      caber e a janela ocupa a tela inteira, sem barras."""
+    global _window_placed, _small_screen
+    if _window_placed:
+        cv2.imshow(WINDOW_NAME, fit_to_screen(cv2, img, *_small_screen) if _small_screen else img)
+        return
+    _window_placed = True
+    tela = pick_screen()
+    if not tela:
+        cv2.imshow(WINDOW_NAME, img)
+        return
+    _nome, x, y, w, h = tela
+    ih, iw = img.shape[:2]
+    extra = 40   # barra de título (sem a barra de ferramentas do Qt: WINDOW_GUI_NORMAL)
+    if iw <= w and ih + extra <= h:
+        # AUTOSIZE com GUI_NORMAL encolhia a janela para 98x55 ao mover
+        # (medido): NORMAL e o tamanho pedido depois de mover
+        cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO | cv2.WINDOW_GUI_NORMAL)
+        cv2.imshow(WINDOW_NAME, img)
+        _move_to_screen(cv2, x + (w - iw) // 2, y + (h - ih - extra) // 2, tela)
+        cv2.resizeWindow(WINDOW_NAME, iw, ih)
+    else:
+        _small_screen = (w, h)
+        cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO | cv2.WINDOW_GUI_NORMAL)
+        cv2.imshow(WINDOW_NAME, fit_to_screen(cv2, img, w, h))
+        # a tela cheia vai para a tela onde a janela está: só depois de ela
+        # chegar na telinha
+        _move_to_screen(cv2, x, y, tela)
+        cv2.setWindowProperty(WINDOW_NAME, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+    try:
+        cv2.setMouseCallback(WINDOW_NAME, _clique)
+    except Exception:
+        pass
+
+
+def _move_to_screen(cv2, px, py, tela, timeout=3.0):
+    """Move a janela e confere onde ela foi parar, repetindo até ela estar na
+    tela pedida. Medido (01/11/2026): logo depois do 1º imshow, o labwc
+    ignora o pedido de ir para a telinha (a janela ficava no HDMI); com 0,1 s
+    de espera já obedece. O getWindowImageRect devolve a posição real."""
+    _nome, x, y, w, h = tela
+    fim = time.monotonic() + timeout
+    while True:
+        cv2.moveWindow(WINDOW_NAME, px, py)
+        cv2.waitKey(100)
+        try:
+            rx, ry, rw, rh = cv2.getWindowImageRect(WINDOW_NAME)
+        except Exception:
+            return   # backend sem essa consulta: fica com o pedido feito
+        cx, cy = rx + rw / 2, ry + rh / 2
+        if (x <= cx < x + w and y <= cy < y + h) or time.monotonic() > fim:
+            return
+
+
 PREP_SECONDS = 3   # aviso antes da calibração de verdade começar, pra pessoa
                      # se posicionar sem que esse tempo conte como amostra
 
@@ -381,6 +512,7 @@ def wait_for_driver(source, landmarker, headless, cv2, player=None):
             result = None
         idx = core.select_driver_index(result.face_landmarks) if result else None
         olhos = False
+        landmarks = None
         if idx is not None:
             landmarks = result.face_landmarks[idx]
             olhos = (len(landmarks) > max(core.LEFT_EYE + core.RIGHT_EYE)
@@ -397,11 +529,8 @@ def wait_for_driver(source, landmarker, headless, cv2, player=None):
             speak_blocking(FALA_ESPERA_MOTORISTA, player)
             falou = True
         if not headless and display_frame is not None:
-            disp = cv2.cvtColor(display_frame, cv2.COLOR_RGB2BGR)
-            cv2.putText(disp, "Aguardando o motorista...", (10, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 165, 255), 2)
-            cv2.imshow(WINDOW_NAME, disp)
-            if cv2.waitKey(1) & 0xFF == ord("q"):
+            show_frame(cv2, UI.espera(display_frame, rosto_ok=olhos, landmarks=landmarks))
+            if tecla(cv2) == ord("q"):
                 raise KeyboardInterrupt
             try:
                 if cv2.getWindowProperty(WINDOW_NAME, cv2.WND_PROP_VISIBLE) < 1:
@@ -431,13 +560,8 @@ def wait_for_ready(source, headless, cv2, seconds=PREP_SECONDS):
         if remaining <= 0:
             break
         if not headless and display_frame is not None:
-            disp = cv2.cvtColor(display_frame, cv2.COLOR_RGB2BGR)
-            cv2.putText(
-                disp, f"Prepare-se... calibrando em {remaining:.0f}s",
-                (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 165, 255), 2,
-            )
-            cv2.imshow(WINDOW_NAME, disp)
-            cv2.waitKey(1)
+            show_frame(cv2, UI.preparo(display_frame, remaining))
+            tecla(cv2)
 
 
 def process_frame(landmarker, timestamp, MpImage, MpImageFormat, infer_frame, iw, ih, t):
@@ -519,18 +643,24 @@ def run_calibration(source, landmarker, headless, cv2, player=None, conferir=Tru
     def on_frame(display_frame, remaining):
         if headless or display_frame is None:
             return
-        disp = cv2.cvtColor(display_frame, cv2.COLOR_RGB2BGR)
-        cv2.putText(
-            disp, f"Calibrando... olhos/boca fechados, cabeca reta ({remaining:.1f}s)",
-            (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2,
-        )
-        cv2.imshow(WINDOW_NAME, disp)
-        cv2.waitKey(1)
+        progresso = 1.0 - max(0.0, remaining) / core.CALIBRATION_SECONDS
+        show_frame(cv2, UI.calibrando(display_frame, progresso, remaining))
+        tecla(cv2)
+
+    # o que a tela mostra enquanto cada fala toca
+    cartoes = {
+        FALA_CALIB_SEM_OLHO: ("Não encontrei seus olhos", "Ajuste a câmera ou a sua posição. Vou calibrar de novo."),
+        FALA_CALIB_DIFERENTE: ("Calibração fora do normal",
+                               "Olhe para a frente, sem arregalar os olhos. Vou calibrar de novo."),
+        FALA_CALIB_BOCA: ("Boca aberta na calibração", "Fique com a boca fechada. Vou calibrar de novo."),
+    }
 
     bocejos_total = []   # bocejo numa tentativa que foi refeita também conta
     for tentativa in range(1, tentativas + 1):
         if conferir:
             wait_for_driver(source, landmarker, headless, cv2, player)
+            mostrar_mensagem(cv2, headless, "Calibração em 3 segundos",
+                             "Sente como se estivesse dirigindo: olhe para a frente, olhos relaxados e boca fechada.")
             speak_blocking(FALA_CALIB_INICIO, player)
         wait_for_ready(source, headless, cv2)
         print(f"Calibrando pra valer (tentativa {tentativa}/{tentativas})... olhos abertos e relaxados, "
@@ -556,17 +686,21 @@ def run_calibration(source, landmarker, headless, cv2, player=None, conferir=Tru
             log_calibration(ear_baseline, mar_baseline, pitch_baseline, warning)
         if problema is None or tentativa == tentativas:
             break
+        mostrar_mensagem(cv2, headless, *cartoes[problema], tipo="aviso")
         speak_blocking(problema, player)
 
     if ear_baseline is None:
         print("Usando limiares padrão (sem calibração válida de olho).")
         if conferir:
+            mostrar_mensagem(cv2, headless, "Calibração não concluída",
+                             "Vou usar os valores padrão. Confira a posição da câmera.", tipo="aviso", etapa=2)
             speak_blocking(FALA_CALIB_PADRAO, player)
         return None, None, None, None, bocejos_total
     print(f"Calibração concluída. EAR olho aberto: {ear_baseline:.3f}"
           + (f"  MAR boca fechada: {mar_baseline:.3f}" if mar_baseline else "  MAR: sem amostras suficientes")
           + (f"  pitch neutro: {pitch_baseline:.3f}" if pitch_baseline is not None else "  pitch: sem amostras suficientes"))
     if conferir:
+        mostrar_mensagem(cv2, headless, "Calibração concluída", "Monitoramento ativo.", tipo="ok", etapa=2)
         speak_blocking(FALA_CALIB_OK, player)
     return ear_baseline, mar_baseline, pitch_baseline, sorriso_baseline, bocejos_total
 
@@ -666,7 +800,14 @@ def run_guided_self_test(source, landmarker, state, cv2, MpImage, MpImageFormat,
     """cenarios: números (1 a 8) pra rodar só esses; None roda todos."""
     print("\n=== MODO AUTOTESTE GUIADO (ver protocolo_testes.md) ===")
     escolhidos = [c for i, c in enumerate(SELF_TEST_SCENARIOS, 1) if not cenarios or i in cenarios]
+    nomes = [c[0] for c in escolhidos]
+    tela = UI if not headless else None
     if not cenarios:
+        if tela:
+            show_frame(cv2, tela.mensagem_autoteste(
+                "Autoteste guiado", f"Vou guiar você por {len(escolhidos)} cenários, um de cada vez. "
+                "Escute a instrução e faça o que eu pedir.", nomes))
+            cv2.waitKey(1)
         speak_blocking(SELF_TEST_INTRO, player)
 
     print(f"(limiares em uso: bocejo>{state.mar_threshold:.3f}  "
@@ -675,7 +816,12 @@ def run_guided_self_test(source, landmarker, state, cv2, MpImage, MpImageFormat,
 
     resultados = []
     try:
-        for nome, instrucao, duracao, avaliar, msg_ok, msg_falha in escolhidos:
+        for indice, (nome, instrucao, duracao, avaliar, msg_ok, msg_falha) in enumerate(escolhidos, 1):
+            feitos = [(r[0], r[1]) for r in resultados]
+            if tela:
+                show_frame(cv2, tela.autoteste(None, None, None, 0.0, indice, len(escolhidos), nome, instrucao,
+                                               duracao, duracao, feitos, nomes))
+                cv2.waitKey(1)
             speak_blocking(instrucao, player)
             print(f"\n[{nome}] {instrucao}")
 
@@ -737,14 +883,11 @@ def run_guided_self_test(source, landmarker, state, cv2, MpImage, MpImageFormat,
                         pitch_min = st["head_pitch"] if pitch_min is None else min(pitch_min, st["head_pitch"])
                         pitch_max = st["head_pitch"] if pitch_max is None else max(pitch_max, st["head_pitch"])
 
-                    if not headless and display_frame is not None:
-                        disp = cv2.cvtColor(display_frame, cv2.COLOR_RGB2BGR)
-                        cv2.putText(disp, f"[{nome}] {remaining:.0f}s restantes", (10, 30),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
-                        cv2.putText(disp, st["status"], (10, 60),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, st["color"], 2)
-                        cv2.imshow(WINDOW_NAME, disp)
-                        cv2.waitKey(1)
+                    if tela and display_frame is not None:
+                        show_frame(cv2, tela.autoteste(display_frame, st, pf["landmarks"], t, indice,
+                                                       len(escolhidos), nome, instrucao, remaining, duracao,
+                                                       feitos, nomes))
+                        tecla(cv2)
 
                 if remaining <= 0:
                     break
@@ -768,8 +911,12 @@ def run_guided_self_test(source, landmarker, state, cv2, MpImage, MpImageFormat,
             passou = bool(avaliar(before, after))
             detalhe = msg_ok if passou else msg_falha
             print(f"  -> {'passou' if passou else 'nao passou'}: {detalhe}  [{telemetria}]")
-            speak_blocking(frase_resultado(passou, detalhe), player)
             resultados.append((nome, passou, detalhe, telemetria))
+            if tela:
+                show_frame(cv2, tela.resultado_cenario(nome, passou, detalhe, nomes,
+                                                       [(r[0], r[1]) for r in resultados]))
+                cv2.waitKey(1)
+            speak_blocking(frase_resultado(passou, detalhe), player)
     except KeyboardInterrupt:
         print("\nAutoteste interrompido pelo usuário.")
 
@@ -778,6 +925,9 @@ def run_guided_self_test(source, landmarker, state, cv2, MpImage, MpImageFormat,
     for nome, passou, detalhe, telemetria in resultados:
         print(f"  [{'OK' if passou else 'FALHOU'}] {nome}: {detalhe}  [{telemetria}]")
     print(f"\n{ok_count}/{len(resultados)} cenários passaram.")
+    if tela and resultados:
+        show_frame(cv2, tela.resumo_autoteste(resultados))
+        cv2.waitKey(1)
     speak_blocking(frase_conclusao(ok_count, len(resultados)), player)
 
     RESULTS_DIR.mkdir(exist_ok=True)
@@ -905,54 +1055,12 @@ def run_live_monitoring(source, landmarker, state, cv2, MpImage, MpImageFormat, 
                     last_printed_status = st["status"]
                 continue
 
-            display = cv2.cvtColor(display_frame, cv2.COLOR_RGB2BGR)
-            dh, dw = display.shape[:2]
+            show_frame(cv2, UI.monitor(
+                display_frame, st, landmarks if face_detected else None, t, perclos=perclos_value,
+                fone=audio_monitor.fone_ok if audio_monitor is not None else None,
+                fps=fps, latencia=latency_ms, limiares=state))
 
-            if face_detected:
-                # landmarks são normalizados (0..1), então valem tanto pro frame
-                # lores (iw x ih) quanto pro main (dw x dh) sem precisar escalar
-                for pt_idx in core.LEFT_EYE + core.RIGHT_EYE:
-                    x = int(landmarks[pt_idx].x * dw)
-                    y = int(landmarks[pt_idx].y * dh)
-                    cv2.circle(display, (x, y), max(2, dw // 320), (0, 255, 0), -1)
-                for pt_idx in core.MOUTH:
-                    x = int(landmarks[pt_idx].x * dw)
-                    y = int(landmarks[pt_idx].y * dh)
-                    cv2.circle(display, (x, y), max(2, dw // 320), (255, 200, 0), -1)
-
-            if st["ear_avg"] is not None:
-                cv2.putText(
-                    display, f"EAR med:{st['ear_avg']:.3f}  L:{st['ear_left']:.3f}  R:{st['ear_right']:.3f}",
-                    (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2,
-                )
-
-            cv2.putText(display, st["status"], (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9,
-                        (0, 0, 255) if st["distraido"] else st["color"], 2)
-            if fone_caiu:
-                cv2.putText(display, "FONE DESCONECTADO - alarme na saida reserva", (10, dh - 45),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-            cv2.putText(
-                display,
-                f"PERCLOS(60s): {perclos_value*100:.0f}%  "
-                f"Piscadas longas(2min): {st['blink_count_recent']}",
-                (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1,
-            )
-            mar_txt = f"{st['mar']:.3f}" if st["mar"] is not None else "-"
-            pitch_txt = f"{st['head_pitch']:.3f}" if st["head_pitch"] is not None else "-"
-            cv2.putText(
-                display,
-                f"MAR: {mar_txt}  Bocejos(5min): {st['yawn_count_recent']}  "
-                f"Pitch: {pitch_txt}  Cabeca-caida(2min): {st['head_down_count_recent']}",
-                (10, 115), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 1,
-            )
-            cv2.putText(
-                display, f"FPS: {fps:.1f}  {dw}x{dh}  latencia IA: {latency_ms:.0f}ms", (10, dh - 15),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1,
-            )
-
-            cv2.imshow(WINDOW_NAME, display)
-
-            key = cv2.waitKey(1) & 0xFF
+            key = tecla(cv2)
             if key == ord("q"):
                 break
             # usuário fechou a janela no X em vez de apertar 'q'
@@ -1024,6 +1132,10 @@ def main():
     headless = args.no_gui or not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
     if headless and not args.no_gui:
         print("Nenhum display gráfico detectado (sem $DISPLAY/$WAYLAND_DISPLAY). Modo texto.")
+    if not headless:
+        global UI
+        import interface
+        UI = interface.Interface.para_tela(pick_screen())
 
     logger = None if args.no_log else core.SessionLogger(args.db)
 

@@ -3,8 +3,8 @@
 # gráfica (~/.config/autostart/tcc-sonolencia.desktop, criado por
 # inicio_automatico.sh ligar), então já tem tela e áudio do usuário.
 #
-# 1. Espera o fone Bluetooth conectar (até 60 s): sem ele, as falas da
-#    calibração e os alarmes não seriam ouvidos.
+# 1. Tenta conectar o fone Bluetooth e espera por ele no máximo 15 s (as falas
+#    da calibração saem melhor nele); depois abre assim mesmo.
 # 2. Roda o monitoramento. Se ele cair por erro (câmera ocupada, travou),
 #    tenta de novo em 5 s, até 10 vezes. Se o usuário fechar a janela (q),
 #    para de vez.
@@ -22,18 +22,32 @@ fones=$(for mac in $(bluetoothctl devices Paired 2>/dev/null | awk '{print $2}')
             bluetoothctl info "$mac" 2>/dev/null | grep -qE "Icon: audio-(headset|headphones)" && echo "$mac"
         done)
 
-for _ in $(seq 1 12); do
-    fone_ativo && break
-    for mac in $fones; do
-        timeout 10 bluetoothctl connect "$mac" >/dev/null 2>&1
+# Tenta conectar os fones em segundo plano (até ~1 min) e só segura a abertura
+# do monitoramento por ESPERA_FONE segundos. Antes o script esperava o fone
+# antes de tudo, tentando um aparelho por vez com até 10 s cada: com a caixa
+# desligada, a janela só aparecia ~3 min depois do login e parecia que o
+# programa não tinha aberto. Se o fone conectar depois, o programa percebe
+# sozinho (AudioOutputMonitor) e os alarmes passam a tocar nele.
+ESPERA_FONE=15
+(
+    for _ in $(seq 1 6); do
+        fone_ativo && exit 0
+        for mac in $fones; do
+            timeout 8 bluetoothctl connect "$mac" >/dev/null 2>&1 &
+        done
+        wait
+        fone_ativo && { echo "== $(date '+%H:%M:%S') fone Bluetooth conectou"; exit 0; }
+        sleep 2
     done
+) &
+for _ in $(seq 1 $ESPERA_FONE); do
     fone_ativo && break
-    sleep 5
+    sleep 1
 done
 if fone_ativo; then
     echo "Fone Bluetooth conectado."
 else
-    echo "Fone Bluetooth não conectou em 60 s: alarmes na saída padrão e no buzzer de reserva."
+    echo "Fone Bluetooth ainda não conectou em $ESPERA_FONE s: abrindo assim mesmo (se ele conectar depois, os alarmes passam para ele)."
 fi
 
 for tentativa in $(seq 1 10); do
