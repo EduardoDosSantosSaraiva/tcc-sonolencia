@@ -71,7 +71,7 @@ O Quadro 5 compara o desempenho da regra final, ajustada observando todos os ví
 
 A medida F1 praticamente não muda entre as duas colunas, o que indica que o ajuste feito na própria base não inflou o resultado de forma relevante: para pessoas que os limiares não viram, o desempenho esperado é equivalente. A diferença está no equilíbrio entre sensibilidade e precisão. Em todas as cinco dobras, a escolha automática preferiu um pico de abertura da boca menor (0,50 em vez de 0,55), que encontra mais bocejos, mas também inventa mais. A regra final mantém o valor mais conservador de propósito, porque um sistema que acusa fadiga quando o condutor apenas conversa tende a ser desligado por ele.
 
-A validação cruzada também mostra quanto o resultado depende das pessoas avaliadas. Com a regra final fixa, a sensibilidade variou de 75,0% a 95,5% entre as cinco dobras, uma amplitude maior que qualquer diferença entre as alternativas de ajuste testadas. Os alarmes falsos se concentraram da mesma forma: dos 6 alarmes de sono e 19 avisos de atenção emitidos pela regra final, 5 alarmes e 12 avisos ocorreram em uma única dobra, ou seja, em um mesmo grupo de 18 participantes.
+A validação cruzada também mostra quanto o resultado depende das pessoas avaliadas. Com a regra final fixa, a sensibilidade variou de 75,0% a 95,5% entre as cinco dobras, uma amplitude maior que qualquer diferença entre as alternativas de ajuste testadas. Os alarmes falsos se concentraram da mesma forma: dos 6 alarmes de sono e 17 avisos de atenção emitidos pela regra final, 5 alarmes e 12 avisos ocorreram em uma única dobra, ou seja, em um mesmo grupo de 18 participantes.
 
 ## 4.5 Desempenho no Raspberry Pi 5
 

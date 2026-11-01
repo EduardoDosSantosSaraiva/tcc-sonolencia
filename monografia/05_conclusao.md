@@ -15,5 +15,4 @@ Esses pontos definem os trabalhos futuros. O primeiro é a validação com sonol
 ## Observações para revisão (não fazem parte do texto)
 
 - **Rascunho de 01/11.** Os parágrafos 4 e 5 mudam se a UTA-RLDD (sono real, rodando de noite) e o teste no carro parado saírem: o "condicional" da resposta passa a citar o que foi medido com sono de verdade e o que foi visto no carro.
-- **F1 da validação cruzada (91,8%):** número da rodada de 20/10; conferir com a rodada de 01/11, feita depois da remoção do modo óculos.
 - **Tamanho:** o modelo do orientador tem uma conclusão de três parágrafos curtos, sem citações. Esta tem cinco; dá para cortar o parágrafo 3 (lição metodológica) se o orientador pedir texto mais curto, mas é o achado que mais distingue o trabalho.
