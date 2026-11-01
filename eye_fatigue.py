@@ -102,6 +102,8 @@ CALIB_DESVIO_MAX = 0.20   # EAR calibrado mais de 20% longe da mediana das
                           # de 7/8 pra 4/8)
 CALIB_HISTORICO_MIN = 3   # com menos calibrações boas que isso, não compara
 
+FALA_ESPERA_MOTORISTA = ("Aguardando o motorista. A calibração começa quando o seu rosto "
+                         "aparecer na frente da câmera.")
 FALA_CALIB_INICIO = ("Calibração em três segundos. Sente como se estivesse dirigindo, "
                      "olhe para a frente com os olhos relaxados e a boca fechada.")
 FALA_CALIB_SEM_OLHO = "Não consegui ver seus olhos. Ajuste a câmera ou a sua posição. Vou calibrar de novo."
@@ -113,7 +115,7 @@ FALA_CALIB_OK = "Calibração concluída. Monitoramento ativo."
 FALA_CALIB_PADRAO = "Não consegui calibrar. Vou usar os valores padrão, mas confira a câmera."
 FALA_FONE_CAIU = "Atenção: o fone desconectou. Os alarmes vão tocar na saída de som reserva."
 FALA_FONE_VOLTOU = "Fone conectado de novo."
-FRASES_PROGRAMA = [FALA_CALIB_INICIO, FALA_CALIB_SEM_OLHO, FALA_CALIB_DIFERENTE, FALA_CALIB_BOCA, FALA_CALIB_OK,
+FRASES_PROGRAMA = [FALA_ESPERA_MOTORISTA, FALA_CALIB_INICIO, FALA_CALIB_SEM_OLHO, FALA_CALIB_DIFERENTE, FALA_CALIB_BOCA, FALA_CALIB_OK,
                    FALA_CALIB_PADRAO, FALA_FONE_CAIU, FALA_FONE_VOLTOU]   # pré-gravadas (gerar_vozes.py)
 
 PIPER_BIN = Path(__file__).parent / "venv" / "bin" / "piper"
@@ -345,6 +347,68 @@ def build_source(args):
 PREP_SECONDS = 3   # aviso antes da calibração de verdade começar, pra pessoa
                      # se posicionar sem que esse tempo conte como amostra
 
+DRIVER_READY_SECONDS = 1.0   # rosto com os dois olhos medidos por esse tempo
+                             # seguido = tem gente sentada, pode calibrar
+DRIVER_SPEAK_AFTER = 2.0     # sem rosto depois disso, avisa por voz (uma vez);
+                             # com o motorista já sentado não fala nada a mais
+
+
+def wait_for_driver(source, landmarker, headless, cv2, player=None):
+    """Espera o motorista aparecer antes de calibrar. O início automático liga
+    o programa com o Pi, muitas vezes sem ninguém na frente (01/11/2026: três
+    tentativas de calibração no vazio e a sessão inteira com limiar padrão,
+    cabeça e sorriso desligados). Espera sem limite de tempo; 'q' ou fechar a
+    janela levanta KeyboardInterrupt, tratado no main como saída normal."""
+    import mediapipe as mp
+
+    ts = core.MonotonicMs()
+    t0 = desde = None
+    falou = False
+    while True:
+        try:
+            frame = source.read()
+        except core.CaptureError:
+            return
+        if frame is None:
+            return
+        infer_frame, display_frame, iw, ih, t = frame
+        if t0 is None:
+            t0 = t
+        try:
+            result = landmarker.detect_for_video(
+                mp.Image(image_format=mp.ImageFormat.SRGB, data=infer_frame), ts.next(t))
+        except Exception:
+            result = None
+        idx = core.select_driver_index(result.face_landmarks) if result else None
+        olhos = False
+        if idx is not None:
+            landmarks = result.face_landmarks[idx]
+            olhos = (len(landmarks) > max(core.LEFT_EYE + core.RIGHT_EYE)
+                     and core.eye_aspect_ratio(landmarks, core.LEFT_EYE, iw, ih) is not None
+                     and core.eye_aspect_ratio(landmarks, core.RIGHT_EYE, iw, ih) is not None)
+        if not olhos:
+            desde = None
+        elif desde is None:
+            desde = t
+        if desde is not None and t - desde >= DRIVER_READY_SECONDS:
+            return
+        if not falou and desde is None and t - t0 >= DRIVER_SPEAK_AFTER:
+            print("Ninguém na frente da câmera: aguardando o motorista para calibrar.")
+            speak_blocking(FALA_ESPERA_MOTORISTA, player)
+            falou = True
+        if not headless and display_frame is not None:
+            disp = cv2.cvtColor(display_frame, cv2.COLOR_RGB2BGR)
+            cv2.putText(disp, "Aguardando o motorista...", (10, 30),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 165, 255), 2)
+            cv2.imshow(WINDOW_NAME, disp)
+            if cv2.waitKey(1) & 0xFF == ord("q"):
+                raise KeyboardInterrupt
+            try:
+                if cv2.getWindowProperty(WINDOW_NAME, cv2.WND_PROP_VISIBLE) < 1:
+                    raise KeyboardInterrupt
+            except cv2.error:
+                raise KeyboardInterrupt
+
 
 def wait_for_ready(source, headless, cv2, seconds=PREP_SECONDS):
     """Contagem regressiva de aviso antes da calibração começar a valer —
@@ -466,6 +530,7 @@ def run_calibration(source, landmarker, headless, cv2, player=None, conferir=Tru
     bocejos_total = []   # bocejo numa tentativa que foi refeita também conta
     for tentativa in range(1, tentativas + 1):
         if conferir:
+            wait_for_driver(source, landmarker, headless, cv2, player)
             speak_blocking(FALA_CALIB_INICIO, player)
         wait_for_ready(source, headless, cv2)
         print(f"Calibrando pra valer (tentativa {tentativa}/{tentativas})... olhos abertos e relaxados, "
@@ -967,8 +1032,18 @@ def main():
         ear_baseline = mar_baseline = pitch_baseline = smile_baseline = None
     else:
         voz = None if args.no_sound else (shutil.which("pw-play") or shutil.which("paplay") or shutil.which("ffplay"))
-        ear_baseline, mar_baseline, pitch_baseline, smile_baseline, bocejos_calib = run_calibration(
-            source, landmarker, headless, cv2, player=voz, conferir=not args.video)
+        try:
+            ear_baseline, mar_baseline, pitch_baseline, smile_baseline, bocejos_calib = run_calibration(
+                source, landmarker, headless, cv2, player=voz, conferir=not args.video)
+        except KeyboardInterrupt:
+            # 'q' esperando o motorista: saída normal (código 0), o início
+            # automático entende como "o usuário fechou" e não reinicia
+            print("\nEncerrado antes da calibração.")
+            landmarker.close()
+            source.close()
+            if logger:
+                logger.close()
+            return
 
     state = build_state(ear_baseline, mar_baseline, pitch_baseline, smile_baseline)
     for t_bocejo in bocejos_calib:   # entra na janela de frequência e no log (1º frame)
