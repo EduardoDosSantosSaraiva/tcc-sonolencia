@@ -561,3 +561,32 @@ def test_3d_ratios_do_not_inflate_when_the_face_is_seen_from_the_side():
 def test_head_yaw_follows_the_rotation():
     for graus in (0, 30, 45, -45):
         assert core.head_yaw_deg(_rosto_girado(graus), 640, 480) == pytest.approx(graus, abs=0.5)
+
+
+def test_tamanho_inferencia_4x3_igual_a_antes_e_resto_sem_esticar():
+    # 4:3 (câmera ao vivo, YawDD, vídeo do benchmark) segue indo para 640x480
+    for w, h in ((640, 480), (1296, 972), (320, 240), (2592, 1944)):
+        assert core.tamanho_inferencia(w, h) == core.LORES_SIZE
+    # celular deitado e em pé: mesma proporção (sem esticar), área ~640x480
+    for w, h in ((1920, 1080), (1080, 1920), (1280, 720), (720, 1280)):
+        tw, th = core.tamanho_inferencia(w, h)
+        assert abs(tw / th - w / h) < 0.01
+        assert abs(tw * th - 640 * 480) / (640 * 480) < 0.01
+    # vídeo pequeno que não é 4:3 não é ampliado
+    assert core.tamanho_inferencia(480, 270) == (480, 270)
+
+
+def test_video_file_source_nao_estica_video_em_pe(tmp_path):
+    cv2 = pytest.importorskip("cv2")
+    import numpy as np
+    caminho = str(tmp_path / "em_pe.avi")
+    out = cv2.VideoWriter(caminho, cv2.VideoWriter_fourcc(*"MJPG"), 30, (360, 640))
+    for _ in range(3):
+        out.write(np.zeros((640, 360, 3), np.uint8))
+    out.release()
+    src = core.VideoFileSource(caminho)
+    infer, disp, iw, ih, _t = src.read()
+    src.close()
+    assert src.tamanho_original == (360, 640)
+    assert disp.shape[:2] == (640, 360)
+    assert abs(iw / ih - 360 / 640) < 0.01 and infer.shape[:2] == (ih, iw)

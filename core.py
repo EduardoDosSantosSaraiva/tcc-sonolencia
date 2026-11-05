@@ -604,6 +604,22 @@ class PicameraSource:
         self.picam2.close()
 
 
+def tamanho_inferencia(iw, ih):
+    """Tamanho do quadro entregue ao MediaPipe a partir de um vídeo iw x ih.
+    Vídeo 4:3 (câmera ao vivo, YawDD) vai para LORES_SIZE como sempre foi.
+    Outra proporção (celular deitado 16:9 ou em pé 9:16, caso da UTA-RLDD)
+    é reduzida SEM esticar, para a mesma área de 640x480: esticar para
+    640x480 distorce o rosto. Medido em 04/11/2026 com um vídeo do YawDD
+    emoldurado em 16:9 e em 9:16: esticado, o EAR mediano ia de 0,228 para
+    0,316 (+39%) e 0,107 (-53%), e o rosto sumia em 18% dos quadros do 9:16;
+    sem esticar, 0,244 e 0,233."""
+    lw, lh = LORES_SIZE
+    if iw * lh == ih * lw:
+        return LORES_SIZE
+    escala = min(1.0, (lw * lh / (iw * ih)) ** 0.5)
+    return max(1, round(iw * escala)), max(1, round(ih * escala))
+
+
 class VideoFileSource:
     """Lê de um arquivo de vídeo em vez da câmera — pra testar de forma
     repetível os casos difíceis (óculos, escuro, rosto virado) sem precisar
@@ -621,6 +637,7 @@ class VideoFileSource:
         self.frame_idx = 0
         self.realtime = realtime
         self._t0_wall = None
+        self.tamanho_original = None   # (largura, altura) do 1º quadro, já girado
 
     def read(self):
         import cv2
@@ -631,8 +648,11 @@ class VideoFileSource:
 
         frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
         ih, iw = frame_rgb.shape[:2]
-        if (iw, ih) != LORES_SIZE:
-            infer = cv2.resize(frame_rgb, LORES_SIZE)
+        if self.tamanho_original is None:
+            self.tamanho_original = (iw, ih)
+        alvo = tamanho_inferencia(iw, ih)
+        if (iw, ih) != alvo:
+            infer = cv2.resize(frame_rgb, alvo)
         else:
             infer = frame_rgb
 

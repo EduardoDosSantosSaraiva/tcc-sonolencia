@@ -82,7 +82,10 @@ def main():
         for pacote in pacotes:
             print(f"== {pacote}: lendo o índice do zip remoto", flush=True)
             z = zip_remoto.abrir(PACOTES[pacote])
-            for info in z.infolist():
+            # alerta e sonolento de todas as pessoas primeiro, pouco vigilante
+            # por último: com a cota do Google limitando o download, o que
+            # importa (alerta x sono na mesma pessoa) fica pronto antes
+            for info in sorted(z.infolist(), key=lambda i: Path(i.filename).stem == "5"):
                 partes = Path(info.filename).parts
                 if info.is_dir() or len(partes) != 3:
                     continue

@@ -139,7 +139,10 @@ def _extrair(path, destino):
         landmarker.close()
         source.close()
     dur = time.perf_counter() - t_ini
-    np.savez_compressed(destino, serie=np.array(linhas, dtype=np.float64))
+    # tamanho_original: largura e altura do vídeo (vídeo que não é 4:3 vai
+    # pro MediaPipe sem esticar, ver core.tamanho_inferencia)
+    np.savez_compressed(destino, serie=np.array(linhas, dtype=np.float64),
+                        tamanho_original=np.array(source.tamanho_original or (0, 0)))
     return len(linhas) / dur if dur > 0 else 0.0
 
 
@@ -147,30 +150,28 @@ def _v(x):
     return None if x != x else x   # nan -> None
 
 
-def simular(serie, eventos=None):
-    """Fase rápida: refaz calibração e detecção a partir das medidas salvas,
-    com a mesma lógica do programa ao vivo (core.calibrar_quadros e
-    eye_fatigue.build_state). Como só usa o core, qualquer ajuste de limiar
-    ou regra pode ser reavaliado nos 349 vídeos em segundos.
-
-    eventos: lista opcional que recebe (t, tipo) de cada alarme, aviso,
-    bocejo, piscada longa e queda de cabeça, pra avaliar por trecho de vídeo
-    (ver avaliar_angulos.py)."""
-    import contextlib, io
+def _jaw_e_sorriso(serie):
+    """jawOpen (coluna 10) e sorriso (média das colunas de mouthSmile) da
+    série; séries antigas não têm essas colunas e voltam NaN."""
     import numpy as np
     import core
-    import eye_fatigue as ef
-
-    # séries novas trazem jawOpen na coluna 10 e o sorriso nas colunas de
-    # mouthSmile (ver _extrair); as antigas não
     jaw = serie[:, 10] if serie.shape[1] > 10 else np.full(len(serie), np.nan)
     c_sorriso = [10 + core.BLENDSHAPES_USADOS.index(n) for n in ("mouthSmileLeft", "mouthSmileRight")]
     sorriso = (serie[:, c_sorriso].mean(axis=1) if serie.shape[1] > max(c_sorriso)
                else np.full(len(serie), np.nan))
+    return jaw, sorriso
+
+
+def calibrar_serie(serie):
+    """Calibração do início da série, com a mesma regra de parada do
+    core.calibrate. Devolve (ear_b, mar_b, pitch_b, sorriso_b, bocejos na
+    calibração, índice do 1º quadro depois da calibração)."""
+    import core
+    jaw, sorriso = _jaw_e_sorriso(serie)
     serie = serie[:, :7]
     t0 = serie[0, 0] if len(serie) else 0.0
-    # mesma regra de parada do core.calibrate: junta CALIBRATION_SECONDS de
-    # rosto em repouso (boca aberta não conta), no máximo CALIBRATION_MAX_SECONDS
+    # junta CALIBRATION_SECONDS de rosto em repouso (boca aberta não conta),
+    # no máximo CALIBRATION_MAX_SECONDS
     quadros = []
     i = 0
     while i < len(serie):
@@ -184,8 +185,36 @@ def simular(serie, eventos=None):
                             m if m == m else None, p if p == p else None, _v(jaw[i]), _v(sorriso[i])))
         i += 1
     ear_b, mar_b, pitch_b, _aviso, bocejos_calib = core.calibrar_quadros(quadros)
+    return ear_b, mar_b, pitch_b, core.sorriso_neutro(quadros), bocejos_calib, i
+
+
+def simular(serie, eventos=None, calibracao=None):
+    """Fase rápida: refaz calibração e detecção a partir das medidas salvas,
+    com a mesma lógica do programa ao vivo (core.calibrar_quadros e
+    eye_fatigue.build_state). Como só usa o core, qualquer ajuste de limiar
+    ou regra pode ser reavaliado nos 349 vídeos em segundos.
+
+    eventos: lista opcional que recebe (t, tipo) de cada alarme, aviso,
+    bocejo, piscada longa e queda de cabeça, pra avaliar por trecho de vídeo
+    (ver avaliar_angulos.py).
+
+    calibracao: (ear_b, mar_b, pitch_b, sorriso_b) vinda de OUTRA série (ex.:
+    calibra no vídeo da pessoa alerta e monitora o vídeo dela com sono, como
+    o motorista que liga o sistema descansado). Aí o vídeo inteiro é
+    monitorado, sem trecho de calibração."""
+    import contextlib, io
+    import core
+    import eye_fatigue as ef
+
+    jaw, sorriso = _jaw_e_sorriso(serie)
+    if calibracao is None:
+        ear_b, mar_b, pitch_b, sorriso_b, bocejos_calib, i = calibrar_serie(serie)
+    else:
+        (ear_b, mar_b, pitch_b, sorriso_b), bocejos_calib, i = calibracao, [], 0
+    serie = serie[:, :7]
+    t0 = serie[0, 0] if len(serie) else 0.0
     with contextlib.redirect_stdout(io.StringIO()):   # build_state imprime os limiares
-        state = ef.build_state(ear_b, mar_b, pitch_b, core.sorriso_neutro(quadros))
+        state = ef.build_state(ear_b, mar_b, pitch_b, sorriso_b)
     for t_b in bocejos_calib:
         state.registrar_bocejo(t_b)
         if eventos is not None:
