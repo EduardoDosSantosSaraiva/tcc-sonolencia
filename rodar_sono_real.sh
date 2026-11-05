@@ -1,9 +1,10 @@
 #!/bin/bash
-# Mede a UTA-RLDD (Fold1: 12 pessoas filmadas alertas, pouco vigilantes e com
-# sono de verdade) para rodar durante a noite: leva umas 3 a 4 h, baixa um
-# vídeo por vez do Google Drive e apaga depois de medir (fica só a série de
+# Mede a UTA-RLDD (60 pessoas, em 10 zips no Google Drive; Fold1 primeiro,
+# alerta e sonolento de todas antes do pouco vigilante). Roda durante a
+# noite: baixa um vídeo por vez e apaga depois de medir (fica só a série de
 # números em uta_rldd/series/). Pode fechar esta janela: o processamento
-# continua sozinho. Se for interrompido (Pi desligado, sem internet), rodar
+# continua sozinho. Se o Google bloquear um zip (cota), passa para outro e
+# volta nele em 30 min. Se for interrompido (Pi desligado, sem internet), rodar
 # de novo continua de onde parou (uta_rldd/progresso.csv).
 # Progresso: tail -f ~/tcc_sonolencia/fila_uta.log
 cd "$(dirname "$0")" || exit 1
@@ -26,8 +27,8 @@ if [ -n "$monitor" ]; then
     done
 fi
 
-echo "== $(date '+%d/%m %H:%M') UTA-RLDD Fold1 (12 pessoas)" >> fila_uta.log
-(cd uta_rldd && setsid nohup ../venv/bin/python processar_uta.py Fold1_part1 Fold1_part2 \
+echo "== $(date '+%d/%m %H:%M') UTA-RLDD (60 pessoas; Fold1 primeiro, pula pacote bloqueado pela cota)" >> fila_uta.log
+(cd uta_rldd && setsid nohup ../venv/bin/python processar_uta.py \
     >> ../fila_uta.log 2>&1 < /dev/null &)
 sleep 10
 echo

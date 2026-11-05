@@ -15,13 +15,18 @@ URL = "https://drive.usercontent.google.com/download?id={id}&export=download&con
 TRECHO = 2 << 20   # 2 MB por pedido: pedidos de 8 MB caíam na página de cota excedida
 
 
+class CotaExcedida(Exception):
+    """O Drive respondeu com a página de cota excedida (a cota é por arquivo)."""
+
+
 class ArquivoRemoto(io.RawIOBase):
-    def __init__(self, file_id, sessao=None):
+    def __init__(self, file_id, sessao=None, desistir_na_cota=False):
+        """desistir_na_cota=True: em vez de esperar a cota voltar, levanta
+        CotaExcedida (quem chama passa para outro arquivo e volta depois)."""
         self.url = URL.format(id=file_id)
         self.s = sessao or requests.Session()
-        r = self.s.get(self.url, headers={"Range": "bytes=0-0"}, timeout=60)
-        r.raise_for_status()
-        self.tamanho = int(r.headers["Content-Range"].split("/")[1])
+        self.desistir_na_cota = desistir_na_cota
+        self.tamanho = int(self._pedido(0, 1).headers["Content-Range"].split("/")[1])
         self.pos = 0
 
     def seekable(self):
@@ -51,10 +56,14 @@ class ArquivoRemoto(io.RawIOBase):
         return b"".join(partes)
 
     def _trecho(self, ini, n):
+        return self._pedido(ini, n).content
+
+    def _pedido(self, ini, n):
         """Um pedido de trecho, conferido: o Drive às vezes responde com uma
         página de "Quota exceeded" no lugar dos bytes (foi o que corrompeu
         a primeira tentativa). Nesse caso espera e tenta de novo, com espera
-        crescente, em vez de entregar lixo pro zipfile."""
+        crescente, em vez de entregar lixo pro zipfile (ou, com
+        desistir_na_cota, levanta CotaExcedida)."""
         espera = 15
         while True:
             try:
@@ -62,8 +71,11 @@ class ArquivoRemoto(io.RawIOBase):
                 ok = (r.status_code == 206 and len(r.content) == n
                       and r.headers.get("content-type", "").startswith("application/octet-stream"))
                 if ok:
-                    return r.content
-                motivo = "cota do Google excedida" if b"Quota exceeded" in r.content[:4000] else f"HTTP {r.status_code}"
+                    return r
+                cota = b"Quota exceeded" in r.content[:4000]
+                if cota and self.desistir_na_cota:
+                    raise CotaExcedida()
+                motivo = "cota do Google excedida" if cota else f"HTTP {r.status_code}"
             except requests.RequestException as e:
                 motivo = type(e).__name__
             print(f"  [download] {motivo}; nova tentativa em {espera} s", flush=True)
@@ -76,5 +88,6 @@ class ArquivoRemoto(io.RawIOBase):
         return len(dados)
 
 
-def abrir(file_id):
-    return zipfile.ZipFile(io.BufferedReader(ArquivoRemoto(file_id), buffer_size=TRECHO))
+def abrir(file_id, desistir_na_cota=False):
+    return zipfile.ZipFile(io.BufferedReader(ArquivoRemoto(file_id, desistir_na_cota=desistir_na_cota),
+                                             buffer_size=TRECHO))
