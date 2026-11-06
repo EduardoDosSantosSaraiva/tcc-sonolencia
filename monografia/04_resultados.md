@@ -1,6 +1,6 @@
 # 4 RESULTADOS E DISCUSSÃO
 
-Este capítulo apresenta os resultados das quatro frentes de avaliação descritas na Seção 3.7: os testes automatizados, o protocolo de testes guiados, a avaliação na base YawDD, com a validação cruzada por participante, e a medição de desempenho no Raspberry Pi 5. Ao final, discutem-se as limitações identificadas.
+Este capítulo apresenta os resultados das cinco frentes de avaliação descritas na Seção 3.7: os testes automatizados, o protocolo de testes guiados, a avaliação na base YawDD, com a validação cruzada por participante, a avaliação com sonolência real na base UTA-RLDD e a medição de desempenho no Raspberry Pi 5. Ao final, discutem-se as limitações identificadas.
 
 ## 4.1 Testes automatizados e regressão
 
@@ -8,7 +8,7 @@ Os 44 testes automatizados da lógica de decisão foram aprovados na versão fin
 
 ## 4.2 Protocolo de testes guiados
 
-O protocolo de oito cenários foi executado doze vezes durante o desenvolvimento, entre 9 e 30 de setembro de 2026, uma vez em 20 de outubro, ainda com as duas falhas de captura descritas na Seção 4.5, e uma última vez em 30 de outubro, já com a captura corrigida. A Figura 2 mostra o número de cenários aprovados em cada rodada.
+O protocolo de oito cenários foi executado doze vezes durante o desenvolvimento, entre 9 e 30 de setembro de 2026, uma vez em 20 de outubro, ainda com as duas falhas de captura descritas na Seção 4.6, e uma última vez em 30 de outubro, já com a captura corrigida. A Figura 2 mostra o número de cenários aprovados em cada rodada.
 
 ::: Figura 2: cenários aprovados em cada rodada do protocolo de testes guiados
 
@@ -22,7 +22,7 @@ A queda para 4 de 8 cenários em 23 de setembro, às 12h19, não decorreu de mud
 
 O cenário dos óculos exigiu duas decisões de projeto. A versão inicial tinha um modo de óculos escuros: quando a região dos olhos ficava mais escura que o resto do rosto, com razão de brilho abaixo de 0,70 por três segundos, o sistema deixava de considerar o EAR e passava a depender da boca e da cabeça. Os únicos óculos escuros disponíveis para o teste tinham lente polarizada, com razão de 0,60 a 0,67, insuficiente para sustentar o modo por três segundos. Em vez de afrouxar o limiar até o caso de teste passar, o critério do cenário foi redefinido, naquele momento, para aceitar tanto o olho fechado detectado quanto o modo de óculos ativado, já que o EAR medido através da lente polarizada caía para 0,07 a 0,11 com os olhos fechados, bem abaixo do limiar de olho fechado. A rodada de 30 de outubro mostrou o risco do próprio modo: no cenário do microssono, sem óculos, a razão de brilho chegou a 0,71, a um centésimo do limiar, e o modo teria desligado o EAR justamente durante um olho fechado, a situação que o alarme de sono existe para detectar. Como o EAR continuou medindo o olho através da lente em todas as rodadas com óculos, o modo foi removido, e o cenário 8 passou a exigir o mesmo que o microssono.
 
-Na rodada de 20 de outubro de 2026, os oito cenários foram aprovados, mas o sistema ainda operava a cerca de 7,7 quadros por segundo e com as cores trocadas (Seção 4.5). A rodada de 30 de outubro, a primeira a 30 quadros por segundo e com a cor correta, aprovou sete dos oito cenários. A calibração registrou EAR de referência de 0,269, próximo ao histórico, o que fixou o limiar de olho fechado em 0,188. Na linha de base, o menor EAR observado foi 0,270, acima desse limiar, enquanto no microssono o EAR chegou a 0,020. Na fala, o MAR não passou de 0,358, abaixo do limiar de pico (0,55) que um bocejo precisa atingir para ser contado, e no bocejo real chegou a 0,842. No cenário da cabeça, o índice *H* subiu de 0,36, na calibração, para até 0,88; a queda tirou o rosto do quadro por 3,8 segundos, depois de um segundo de cabeça baixa com olhos se fechando, e foi contada pela regra descrita na Seção 3.4. O cenário dos óculos falhou porque os olhos não foram mantidos fechados pelo tempo pedido: o menor EAR, de 0,036, mostra que as piscadas foram vistas através da lente, mas nenhum fechamento chegou a 1,5 segundo. [[PENDENTE: refazer o cenário 8 (./autoteste.sh --cenario 8) e descrever o resultado aqui.]] Nos cenários aprovados, os valores observados ficaram longe dos limiares de decisão, o que indica que a aprovação não dependeu de casos no limite.
+Na rodada de 20 de outubro de 2026, os oito cenários foram aprovados, mas o sistema ainda operava a cerca de 7,7 quadros por segundo e com as cores trocadas (Seção 4.6). A rodada de 30 de outubro, a primeira a 30 quadros por segundo e com a cor correta, aprovou sete dos oito cenários. A calibração registrou EAR de referência de 0,269, próximo ao histórico, o que fixou o limiar de olho fechado em 0,188. Na linha de base, o menor EAR observado foi 0,270, acima desse limiar, enquanto no microssono o EAR chegou a 0,020. Na fala, o MAR não passou de 0,358, abaixo do limiar de pico (0,55) que um bocejo precisa atingir para ser contado, e no bocejo real chegou a 0,842. No cenário da cabeça, o índice *H* subiu de 0,36, na calibração, para até 0,88; a queda tirou o rosto do quadro por 3,8 segundos, depois de um segundo de cabeça baixa com olhos se fechando, e foi contada pela regra descrita na Seção 3.4. O cenário dos óculos falhou porque os olhos não foram mantidos fechados pelo tempo pedido: o menor EAR, de 0,036, mostra que as piscadas foram vistas através da lente, mas nenhum fechamento chegou a 1,5 segundo. [[PENDENTE: refazer o cenário 8 (./autoteste.sh --cenario 8) e descrever o resultado aqui.]] Nos cenários aprovados, os valores observados ficaram longe dos limiares de decisão, o que indica que a aprovação não dependeu de casos no limite.
 
 ## 4.3 Avaliação na base YawDD
 
@@ -73,11 +73,58 @@ A medida F1 praticamente não muda entre as duas colunas, o que indica que o aju
 
 A validação cruzada também mostra quanto o resultado depende das pessoas avaliadas. Com a regra final fixa, a sensibilidade variou de 75,0% a 95,5% entre as cinco dobras, uma amplitude maior que qualquer diferença entre as alternativas de ajuste testadas. Os alarmes falsos se concentraram da mesma forma: dos 6 alarmes de sono e 17 avisos de atenção emitidos pela regra final, 5 alarmes e 12 avisos ocorreram em uma única dobra, ou seja, em um mesmo grupo de 18 participantes.
 
-## 4.5 Desempenho no Raspberry Pi 5
+## 4.5 Avaliação com sonolência real
 
-O teste de resistência processou um vídeo da YawDD na maior velocidade possível por 20 minutos contínuos, num total de 44.253 quadros, com o rosto detectado em todos eles. O Quadro 6 resume o resultado, e a Figura 4 mostra a taxa de quadros e a temperatura ao longo do teste.
+Os 21 participantes da UTA-RLDD tiveram a calibração dos olhos válida nos dois vídeos, e o rosto foi detectado em pelo menos 99,3% dos quadros de cada vídeo. O Quadro 6 compara as medidas do olho entre o vídeo alerta e o sonolento de cada participante, e a Figura 4 mostra a duração média da piscada de cada um nos dois estados.
 
-::: Quadro 6: desempenho no teste de resistência de 20 minutos
+::: Quadro 6: medidas do olho nos vídeos alerta e sonolento dos 21 participantes da UTA-RLDD
+
+| Medida | Alerta (mediana) | Sonolento (mediana) | Participantes em que aumentou | Valor *p* |
+|---|---|---|---|---|
+| Duração média da piscada | 129 ms | 219 ms | 20 de 21 | < 0,001 |
+| Duração da piscada, percentil 90 | 167 ms | 300 ms | 20 de 21 | < 0,001 |
+| Piscadas de 0,5 s ou mais | 0,0% | 4,3% | 18 de 21 | < 0,001 |
+| Fechamentos de 1 s ou mais | 0,0 por hora | 12,0 por hora | 15 de 21 | < 0,001 |
+| PERCLOS do vídeo inteiro | 1,1% | 3,7% | 18 de 21 | < 0,001 |
+| Frequência de piscadas | 12,9 por minuto | 17,4 por minuto | 16 de 21 | 0,011 |
+
+::: Fonte: autoria própria. Valor *p* do teste exato dos postos sinalizados de Wilcoxon, bilateral.
+
+::: Figura 4: duração média da piscada de cada participante da UTA-RLDD, no vídeo alerta e no sonolento
+
+![Figura 4](figuras/figura4_uta_piscada.svg)
+
+::: Fonte: autoria própria
+
+Todas as medidas do olho aumentaram no estado sonolento, e de forma consistente entre as pessoas. A duração média da piscada aumentou em 20 dos 21 participantes, de 129 para 219 ms na mediana; no participante restante, ela ficou praticamente igual nos dois vídeos, em 114 ms. A proporção de piscadas de meio segundo ou mais, que o sistema conta como piscadas longas, passou de zero para 4,3% na mediana, e os fechamentos de um segundo ou mais, ausentes em 18 dos 21 vídeos alerta, chegaram a 12 por hora no estado sonolento, sem que nenhum participante os tivesse em menor número com sono do que alerta. O alongamento das piscadas com a sonolência é coerente com a literatura sobre os parâmetros de piscada¹⁸ e confirma, agora com sonolência espontânea, a premissa central do sistema: a sonolência aparece primeiro no tempo em que os olhos permanecem fechados. A Figura 4 evidencia também a variação entre pessoas já descrita na literatura¹⁹: no estado alerta, a duração média da piscada vai de cerca de 90 a 260 ms, e há participantes cuja piscada com sono é mais curta que a piscada alerta de outros, o que justifica a calibração individual. A frequência de piscadas também aumentou, mas de modo menos consistente, em 16 dos 21 participantes, e por isso não é usada como critério de decisão.
+
+O Quadro 7 resume a resposta do sistema completo.
+
+::: Quadro 7: alertas emitidos pelo sistema nos vídeos alerta e sonolento dos 21 participantes da UTA-RLDD
+
+| Medida | Vídeos alerta | Vídeos sonolentos, calibração no próprio vídeo | Vídeos sonolentos, calibração do vídeo alerta |
+|---|---|---|---|
+| Vídeos com algum alarme ou aviso | 4 de 21 | 12 de 21 | 16 de 21 |
+| Vídeos com alarme de sono | 3 de 21 | 10 de 21 | 11 de 21 |
+| Alarmes de sono por hora (todos os vídeos) | 1,1 | 24,9 | 47,3 |
+| Avisos de atenção por hora (todos os vídeos) | 6,2 | 100,6 | 94,6 |
+| Piscadas longas por hora (mediana dos participantes) | 0,0 | 37,9 | 41,9 |
+
+::: Fonte: autoria própria
+
+O sistema completo respondeu ao estado sonolento nos dois modos de calibração. Por participante, as piscadas longas, os avisos de atenção e os alarmes de sono por hora aumentaram significativamente em relação ao vídeo alerta, com *p* ≤ 0,002 nos dois modos. Com a calibração do vídeo alerta, situação de quem liga o sistema descansado, 16 dos 21 vídeos sonolentos geraram algum alarme ou aviso, contra 4 dos 21 vídeos alerta. Calibrado no próprio vídeo sonolento, o sistema sinalizou 12 dos 21, porque a referência de olho aberto passa a ser medida com o olho já mais fechado: o EAR de referência foi menor no vídeo sonolento em 15 dos 21 participantes, e o limiar de olho fechado, proporcional a ele, desce junto. O resultado reforça que a calibração deve ser feita no início da viagem, com o condutor descansado, que é o uso previsto. Bocejos e quedas de cabeça foram pouco frequentes: o bocejo apareceu em cinco vídeos sonolentos e em nenhum vídeo alerta (*p* = 0,062), e a queda de cabeça, com a calibração do vídeo alerta, em seis vídeos sonolentos e em um vídeo alerta (*p* = 0,031).
+
+A análise dos cinco vídeos sonolentos sem nenhum alerta, com a calibração do vídeo alerta, indica que, em sua maioria, não se trata de sonolência perdida pelo sistema, e sim de sonolência que não se manifestou nos olhos durante a gravação. Dos 15 participantes com ao menos um fechamento de um segundo ou mais no vídeo sonolento, o sistema alertou 14; dos seis sem nenhum fechamento desse tipo, alertou dois, com avisos de atenção. Em quatro dos cinco vídeos sem alerta não houve nenhum fechamento de um segundo ou mais, e no quinto houve um único, em sete minutos de gravação. O rótulo da base é a autoavaliação do participante sobre o estado predominante na gravação, e o nível sonolento da KSS descreve quem precisa se esforçar para se manter acordado, não quem já cochila. O alarme de sono, por sua vez, foi projetado para o fechamento de 1,5 segundo, que antecede o microssono, e os avisos de atenção exigem piscadas longas repetidas ou PERCLOS elevado, sinais ausentes nesses vídeos. A dificuldade da base é conhecida: segundo os autores, observadores humanos que assistiram aos vídeos sem som acertaram o estado em menos de 60% dos casos, e o modelo de referência proposto por eles chegou a 65,2% de acerto, ambos na classificação em três estados²⁸. Esses números não são diretamente comparáveis aos deste trabalho, que não classifica o estado e compara cada participante consigo mesmo, mas mostram que a sonolência declarada nem sempre é visível no rosto.
+
+Nos vídeos alerta, quatro dos 21 tiveram algum alarme ou aviso, num total de 4 alarmes de sono e 22 avisos de atenção em 3,5 horas, ou 1,1 alarme e 6,2 avisos por hora, taxas da mesma ordem das medidas como falsas na YawDD, de 2,3 e 6,4 por hora (Quadro 4). Em um desses participantes, a duração média da piscada (259 ms) e o PERCLOS (11,1%) do vídeo alerta foram iguais aos do vídeo sonolento, o que sugere um padrão próprio de piscadas lentas ou um rótulo pouco representativo da gravação. Como a base não marca os instantes de sonolência, não é possível distinguir essas hipóteses, nem medir a sensibilidade por episódio ou a antecedência dos alertas.
+
+Em conjunto, os resultados mostram que as medidas em que o sistema se baseia respondem à sonolência espontânea em pessoas, câmeras e ambientes que não participaram do desenvolvimento, já que nenhum parâmetro foi ajustado a partir desta base, e que o sistema converte essa diferença em alertas na grande maioria dos casos em que ela aparece nos olhos.
+
+## 4.6 Desempenho no Raspberry Pi 5
+
+O teste de resistência processou um vídeo da YawDD na maior velocidade possível por 20 minutos contínuos, num total de 44.253 quadros, com o rosto detectado em todos eles. O Quadro 8 resume o resultado, e a Figura 5 mostra a taxa de quadros e a temperatura ao longo do teste.
+
+::: Quadro 8: desempenho no teste de resistência de 20 minutos
 
 | Medida | Resultado |
 |---|---|
@@ -92,9 +139,9 @@ O teste de resistência processou um vídeo da YawDD na maior velocidade possív
 
 O desempenho se manteve estável do início ao fim: a temperatura se estabilizou em torno de 60 °C nos primeiros minutos, bem abaixo da faixa em que o processador reduz a frequência, que permaneceu em 2,4 GHz. A duração de 20 minutos foi suficiente por esse motivo: nas medições anteriores, a temperatura já se estabilizava entre 3 e 5 minutos, e a partir daí o comportamento não mudava. O quadro mais lento levou 129,8 ms, caso isolado, já que 99% dos quadros ficaram abaixo de 28,6 ms. Da média de 24,6 ms por quadro, 23,2 ms correspondem ao MediaPipe, executado em C++; a lógica escrita em Python, das medidas à decisão, responde por cerca de 1,4 ms, aproximadamente 6% do tempo.
 
-::: Figura 4: taxa de quadros e temperatura no teste de resistência de 20 minutos
+::: Figura 5: taxa de quadros e temperatura no teste de resistência de 20 minutos
 
-![Figura 4](figuras/figura4_benchmark.svg)
+![Figura 5](figuras/figura4_benchmark.svg)
 
 ::: Fonte: autoria própria
 
@@ -104,9 +151,9 @@ Uma segunda falha da captura foi encontrada depois: a câmera entregava os canai
 
 O registro de energia do Raspberry Pi, no entanto, indicou subtensão e redução de velocidade desde a inicialização. A placa exige fonte de 5 V e até 5 A²⁵, e a fonte usada no desenvolvimento não atendia plenamente a essa especificação. Embora a frequência do processador tenha permanecido em 2,4 GHz durante as medições, a instalação no veículo requer uma fonte dimensionada para a placa, já que a tensão de um sistema automotivo varia com a partida do motor e com a carga elétrica.
 
-## 4.6 Limitações
+## 4.7 Limitações
 
-Os resultados devem ser lidos à luz de algumas limitações. A primeira, e mais importante, é que nenhuma das avaliações envolveu sonolência real: no protocolo guiado, os autores simularam os fechamentos de olhos, os bocejos e as quedas de cabeça, e na YawDD os participantes estavam despertos. A detecção de microssono foi validada, portanto, pelo comportamento do sistema diante de fechamentos simulados com a duração característica, e não por episódios espontâneos. A validação com condutores efetivamente sonolentos exigiria uma base como a NTHU-DDD, cujo acesso depende de termo assinado pela instituição, ou um protocolo próprio de privação de sono, com aprovação de comitê de ética.
+Os resultados devem ser lidos à luz de algumas limitações. A primeira, e mais importante, é que a sonolência real foi avaliada apenas por vídeo, sem episódios marcados no tempo. Na UTA-RLDD, o rótulo é a autoavaliação do participante sobre a gravação inteira, foram usados 21 dos 60 participantes, e os vídeos foram gravados em ambientes internos, fora da condução, sem iluminação noturna nem a vibração do veículo, como os próprios autores ressaltam²⁸. Além disso, os vídeos alerta e sonolento de uma mesma pessoa foram gravados em sessões diferentes, por vezes com outro aparelho ou outra orientação da câmera, o que afeta a comparação feita com a calibração do vídeo alerta. Não há, portanto, medida da sensibilidade a microssonos espontâneos: no protocolo guiado, os autores simularam os fechamentos de olhos, os bocejos e as quedas de cabeça, e na YawDD os participantes estavam despertos. A detecção do microssono foi validada pelo comportamento do sistema diante de fechamentos simulados com a duração característica, e a resposta à sonolência real, pela comparação entre estados na UTA-RLDD. Medir a sensibilidade a episódios espontâneos exigiria uma base com episódios marcados, como a NTHU-DDD, cujo acesso depende de termo assinado pela instituição, ou um protocolo próprio de privação de sono, com aprovação de comitê de ética.
 
 A segunda limitação é a iluminação. A câmera usada não tem filtro de infravermelho e conta com LEDs infravermelhos que se acendem com pouca luz, mas o sistema não foi avaliado em condução noturna, justamente o período de maior risco segundo os dados da PRF³. Os testes com óculos, por sua vez, usaram uma única lente, polarizada; lentes mais escuras ou espelhadas ainda precisam ser avaliadas.
 
@@ -117,6 +164,9 @@ A terceira refere-se aos parâmetros do bocejo, ajustados com a própria base em
 ## Observações para revisão (não fazem parte do texto)
 
 - **Pendente:** o trecho marcado com `[[...]]` na Seção 4.2 espera a refação do cenário 8 (`./autoteste.sh --cenario 8`, fechando os olhos de óculos por 3 s).
-- **Figuras 2, 3 e 4:** geradas por `figuras_cap4.py` a partir dos arquivos de resultado; rodar de novo depois de cada medição. A refação de um cenário só não entra na Figura 2, que mostra só rodadas completas.
+- **Figuras 2 a 5:** geradas por `figuras_cap4.py` a partir dos arquivos de resultado; rodar de novo depois de cada medição. A refação de um cenário só não entra na Figura 2, que mostra só rodadas completas. A Figura 5 (desempenho) continua no arquivo `figura4_benchmark.svg`; só o número no texto mudou.
+- **Seção 4.5 (UTA-RLDD), números de 05/11/2026:** 21 participantes, análise em `uta_rldd/resultados/20261105_225023/` (`relatorio.md` e `por_video.csv`). A medição continua rodando quando a cota do Google libera; com mais participantes, rodar `uta_rldd/analisar_uta.py` e `figuras_cap4.py` e atualizar todos os números da seção, da Seção 3.7, do Cap. 5 e do Resumo/Abstract. Os números da análise dos vídeos sem alerta (15 → 14, 6 → 2, EAR de referência menor em 15 de 21, um fechamento em 7 min) não saem no relatório: foram calculados à parte a partir do `por_video.csv` e das séries.
+- **Citações do artigo da base (ref. 28), conferidas no texto do artigo:** observadores humanos "under 60%" (três classes, vídeos sem som); modelo de referência 65,2%; gravação "in indoor real-life environments", "has not been obtained from driving", sem iluminação noturna nem vibração do carro.
+- **Participante sem aumento da piscada:** Fold2-19 (114,2 → 113,7 ms). O de piscadas lentas nos dois vídeos é o Fold2-15. Os cinco sonolentos sem alerta (calibração do alerta): Fold1-04, 06, 07, 11 e Fold2-19.
 - **Infravermelho e óculos escuros:** o texto não afirma que o infravermelho atravessa lentes escuras (não há referência para isso); afirma só o que foi medido com a lente polarizada. A referência 20 sustenta apenas o uso do infravermelho à noite.
 - **Fonte:** a mesma fonte do desenvolvimento deu registro de energia limpo em 30/10 e 01/11, com o Pi pouco carregado; a frase da Seção 4.5 se refere às medições de 30/09 e 20/10, feitas com a placa a plena carga.

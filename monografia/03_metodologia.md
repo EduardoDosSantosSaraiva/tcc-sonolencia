@@ -108,7 +108,7 @@ Para validar o sistema com o próprio condutor, foi criado um modo de autoteste 
 
 O cenário 8 tem o mesmo critério do microssono porque os óculos não mudam o que o sistema precisa fazer: se o condutor fecha os olhos, o alarme de sono deve disparar, com ou sem lente.
 
-## 3.7 Avaliação em base pública, testes automatizados e desempenho
+## 3.7 Avaliação em bases públicas, testes automatizados e desempenho
 
 A avaliação com uma população maior que a dos autores foi feita na base YawDD²¹, cujos vídeos têm resolução de 640 × 480 pixels a 30 quadros por segundo e foram gravados em um veículo, com iluminação real e variável, por participantes de ambos os sexos, com e sem óculos. A base tem dois conjuntos. No conjunto Mirror, com a câmera sob o retrovisor, cada participante aparece em três ou quatro vídeos separados: dirigindo em silêncio, falando ou cantando, e bocejando. Foram usados os 320 vídeos disponíveis desse conjunto, de 90 participantes (115 de bocejo, 100 de fala e 105 de condução normal). No conjunto Dash, com a câmera no painel, cada um dos 29 participantes aparece em um único vídeo com todos os comportamentos. No total, são 349 vídeos e cerca de 2,7 horas de gravação.
 
@@ -116,16 +116,31 @@ Cada vídeo é processado com o mesmo código do programa ao vivo: os primeiros 
 
 Como parte dos limiares de bocejo foi ajustada observando os próprios vídeos da YawDD, o resultado nesses vídeos tende a ser otimista. Para estimar o desempenho em pessoas que o ajuste não viu, foi feita uma validação cruzada por participante em cinco dobras: os participantes são divididos em cinco grupos, mantendo todos os vídeos de uma mesma pessoa no mesmo grupo; para cada grupo, os quatro parâmetros do bocejo são escolhidos, entre 81 combinações, usando apenas os outros quatro grupos, e o desempenho é medido no grupo deixado de fora.
 
+Como nenhum participante da YawDD está sonolento, a resposta do sistema à sonolência real foi avaliada na base UTA-RLDD (*UTA Real-Life Drowsiness Dataset*)²⁸, na qual 60 participantes gravaram a si mesmos, com o próprio celular ou *webcam*, em três estados, por cerca de dez minutos em cada: alerta, pouco vigilante e sonolento. O estado de cada vídeo foi atribuído pelo próprio participante com a Escala de Sonolência de Karolinska (KSS)²⁹: alerta corresponde aos níveis 1 a 3 da escala, e sonolento, aos níveis 8 e 9, em que é preciso esforço para se manter acordado. Por limite de volume de download do serviço que hospeda a base, foram usados os vídeos alerta e sonolento dos 21 primeiros participantes, na ordem das dobras definidas pelos autores, num total de 42 vídeos e 7,1 horas de gravação, com resoluções de 240 × 426 a 1440 × 2560 pixels e taxas de 12 a 30 quadros por segundo. Os vídeos passaram pelo mesmo processamento da YawDD, com a imagem reduzida sem alterar sua proporção, e cada vídeo foi apagado logo após a extração das medidas.
+
+Como a base rotula o vídeo inteiro e não cada instante, a análise compara, para cada participante, o vídeo alerta com o sonolento, em dois níveis. No primeiro, as medidas do olho são calculadas diretamente da série do EAR, suavizada como no sistema e tendo como referência a mediana do EAR do próprio vídeo: cada trecho com EAR abaixo de 70% da referência conta como um fechamento, e dele se obtêm a duração média das piscadas e o seu percentil 90, a proporção de piscadas de 0,5 segundo ou mais, o número de fechamentos de um segundo ou mais por hora e a frequência de piscadas, além do PERCLOS do vídeo inteiro, com o limiar de 50% da referência usado pelo sistema. No segundo nível, o sistema completo é aplicado ao vídeo e contam-se, por hora, as piscadas longas, os avisos de atenção, os alarmes de sono, os bocejos e as quedas de cabeça. O vídeo sonolento é avaliado de duas formas: com a calibração feita nos primeiros segundos do próprio vídeo, como se o sistema fosse ligado com o condutor já sonolento, e com a calibração obtida no vídeo alerta da mesma pessoa, situação de quem liga o sistema descansado e fica sonolento ao longo da viagem. A diferença entre os dois estados é avaliada pelo teste exato dos postos sinalizados de Wilcoxon³⁰, bilateral, adequado a amostras pareadas pequenas por não supor distribuição normal; os participantes com o mesmo valor nos dois vídeos são excluídos do teste, como o método prevê.
+
 A lógica de decisão é coberta por 44 testes automatizados, escritos com a biblioteca pytest, que alimentam a máquina de estados com sequências sintéticas de medidas e verificam o comportamento esperado em cada situação, como a piscada longa, o bocejo de olhos fechados e a queda da cabeça que tira o rosto do quadro. Complementarmente, um teste de regressão reaplica as regras atuais aos 349 vídeos da YawDD e aos 86 episódios de alarme de sono registrados nas sessões ao vivo durante o desenvolvimento, e acusa qualquer piora em relação a uma referência salva. Esse segundo conjunto protege contra uma regra nova que reduza alarmes falsos à custa de esconder um fechamento de olhos real.
 
 Por fim, o desempenho na plataforma-alvo foi medido por uma ferramenta própria, que processa um vídeo da YawDD na maior velocidade possível e registra, quadro a quadro, o tempo gasto apenas pelo MediaPipe e o tempo total do quadro até a decisão, com média, mediana e percentis de 95% e 99%. A cada dez segundos são registrados também a taxa de quadros, o uso de processador, a temperatura, a frequência de operação do processador e o registro de subtensão e de redução de velocidade do Raspberry Pi. Além de uma medição curta, foi realizado um teste de resistência de 20 minutos contínuos, que repete o vídeo para verificar se o desempenho se mantém com o aquecimento da placa.
+
+# REFERÊNCIAS BIBLIOGRÁFICAS
+
+> Referências citadas pela primeira vez neste capítulo. A numeração continua a do Capítulo 2 (16 a 27); na montagem do PDF, todas formam uma única lista ao final do texto.
+
+28. GHODDOOSIAN, Reza; GALIB, Marnim; ATHITSOS, Vassilis. A realistic dataset and baseline temporal model for early drowsiness detection. In: **IEEE/CVF Conference on Computer Vision and Pattern Recognition Workshops (CVPRW)**, 2019, Long Beach. Anais [...]. Piscataway: IEEE, 2019. p. 178–187. DOI: https://doi.org/10.1109/CVPRW.2019.00027.
+
+29. ÅKERSTEDT, Torbjörn; GILLBERG, Mats. Subjective and objective sleepiness in the active individual. **International Journal of Neuroscience**, v. 52, n. 1–2, p. 29–37, 1990. DOI: https://doi.org/10.3109/00207459008994241.
+
+30. WILCOXON, Frank. Individual comparisons by ranking methods. **Biometrics Bulletin**, v. 1, n. 6, p. 80–83, 1945. DOI: https://doi.org/10.2307/3001968.
 
 ---
 
 ## Observações para revisão (não fazem parte do texto)
 
 - **Tamanho:** cerca de 3.000 palavras de texto e três quadros, contra 1.790 palavras e sete figuras no Cap. 3 do TCC-modelo. Dá para enxugar se o orientador achar longo; o mais fácil de cortar é o detalhamento das condições adversas (Seção 3.4, último parágrafo).
-- **Sem referências novas:** este capítulo só cita referências já listadas (9, 14, 15, 19 e 21).
+- **Referências novas (05/11/2026):** 28 (UTA-RLDD), 29 (KSS) e 30 (Wilcoxon), conferidas na Crossref (autores, título, veículo, páginas e DOI). As demais citadas aqui já estavam listadas (9, 14, 15, 19 e 21).
+- **UTA-RLDD (Seção 3.7):** números de 05/11/2026 (21 participantes); se a medição continuar com mais participantes, atualizar "21", "42 vídeos", "7,1 horas", resoluções e taxas de quadros, junto com a Seção 4.5. Os níveis da KSS de cada classe foram conferidos no artigo da base (níveis 4 e 5 não pertencem a nenhuma classe).
 - **Conferido no código em 20/10/2026** (`core.py`, `eye_fatigue.py`, `gerar_vozes.py`, `avaliar_yawdd.py`, `validacao_cruzada.py`, `benchmark.py`): todos os números do texto e dos quadros. Se algum limiar mudar no código, o Quadro 1 e a Seção 3.4 precisam mudar junto.
 - **Figura 1:** diagrama de blocos em `figuras/figura1_arquitetura.svg` (vetorial, embutido no HTML e no PDF; para colar no Google Docs há uma cópia em PNG na Área de Trabalho, "TCC - Figura 1.png"). Outras figuras úteis: foto da montagem no carro, captura da tela com os pontos no rosto (rosto do autor, com autorização dele) e o gráfico do EAR numa piscada longa.
 - **A confirmar com os autores:** modelo exato do fone (Lenovo ThinkPlus GM2 Pro) e tamanho da tela SPI.

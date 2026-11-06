@@ -6,7 +6,10 @@ Gera as figuras do Capítulo 4 a partir dos arquivos de resultado, em SVG
     figuras/figura2_autoteste.svg      cenários aprovados em cada rodada do autoteste
     figuras/figura3_bocejo_grupos.svg  sensibilidade do bocejo por grupo, versão
                                        inicial (26/09) x versão final, no YawDD
+    figuras/figura4_uta_piscada.svg    duração média da piscada de cada participante,
+                                       alerta x sonolento, na UTA-RLDD
     figuras/figura4_benchmark.svg      FPS e temperatura no teste de resistência
+                                       (Figura 5 no texto; o nome do arquivo ficou)
 
 Sempre pega o resultado mais recente de cada medição: depois de uma rodada
 nova, é só rodar de novo.
@@ -176,7 +179,56 @@ def figura_bocejo():
 
 
 # ---------------------------------------------------------------------------
-# Figura 4: teste de resistência
+# Figura 4: UTA-RLDD, duração da piscada alerta x sonolento
+# ---------------------------------------------------------------------------
+
+def uta_por_video():
+    """por_video.csv da análise mais recente da UTA-RLDD."""
+    pastas = sorted((PROJETO / "uta_rldd" / "resultados").glob("*/por_video.csv"))
+    if not pastas:
+        return None, []
+    return pastas[-1], list(csv.DictReader(open(pastas[-1])))
+
+
+def figura_uta():
+    arq, linhas = uta_por_video()
+    if not linhas:
+        print("  (análise da UTA-RLDD ainda não rodou)")
+        return
+    por_pessoa = {}
+    for r in linhas:
+        por_pessoa.setdefault(r["pessoa_id"], {})[r["rotulo"]] = float(r["dur_piscada_ms"])
+    pares = [(p, v["alerta"], v["sonolento"]) for p, v in por_pessoa.items()
+             if "alerta" in v and "sonolento" in v]
+    pares.sort(key=lambda x: x[2] / x[1], reverse=True)     # maior aumento no topo
+
+    fig, ax = plt.subplots(figsize=(LARGURA_POL, 0.2 * len(pares) + 0.9))
+    for i, (_p, a, d) in enumerate(pares):
+        ax.plot([a, d], [i, i], color=GRADE, linewidth=2, solid_capstyle="round", zorder=1)
+        ax.scatter([a], [i], s=36, color=AZUL_CLARO, edgecolors="white", linewidths=1.2, zorder=2)
+        ax.scatter([d], [i], s=36, color=AZUL_ESCURO, edgecolors="white", linewidths=1.2, zorder=3)
+    # numeração da própria base (Fold1-01 -> 1), para casar com o texto
+    ax.set_yticks(range(len(pares)), [str(int(p.split("-")[1])) for p, _, _ in pares], fontsize=8)
+    ax.set_ylabel("Participante (numeração da base)")
+    ax.invert_yaxis()
+    ax.set_xscale("log")
+    marcas = [50, 100, 200, 500, 1000, 2000]
+    ax.set_xticks(marcas, [f"{m:,}".replace(",", ".") for m in marcas])   # 1.000, como no texto
+    ax.minorticks_off()
+    ax.set_xlim(70, 2000)
+    ax.set_xlabel("Duração média da piscada (ms, escala logarítmica)")
+    ax.grid(axis="y", visible=False)
+    ax.spines["left"].set_visible(False)
+    leg = [plt.Line2D([], [], marker="o", linestyle="", markersize=6, color=c, markeredgecolor="white")
+           for c in (AZUL_CLARO, AZUL_ESCURO)]
+    ax.legend(leg, ["Vídeo alerta", "Vídeo sonolento"], loc="lower center",
+              bbox_to_anchor=(0.5, 1.0), ncol=2, fontsize=8.5, handletextpad=0.3, columnspacing=1.6)
+    salvar(fig, "figura4_uta_piscada.svg")
+    print(f"    (dados: {arq.parent.name}, {len(pares)} participantes)")
+
+
+# ---------------------------------------------------------------------------
+# Figura 5: teste de resistência
 # ---------------------------------------------------------------------------
 
 def benchmark_resistencia():
@@ -230,4 +282,5 @@ if __name__ == "__main__":
     print("Figuras do Capítulo 4:")
     figura_autoteste()
     figura_bocejo()
+    figura_uta()
     figura_benchmark()
