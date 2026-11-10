@@ -202,20 +202,30 @@ def figura_uta():
              if "alerta" in v and "sonolento" in v]
     pares.sort(key=lambda x: x[2] / x[1], reverse=True)     # maior aumento no topo
 
-    fig, ax = plt.subplots(figsize=(LARGURA_POL, 0.2 * len(pares) + 0.9))
+    # 0,2 pol por participante até ~30; acima disso comprime para caber na página (~7 pol)
+    linha = min(0.2, 6.2 / len(pares))
+    fig, ax = plt.subplots(figsize=(LARGURA_POL, linha * len(pares) + 0.9))
+    XMAX = 2000   # acima disso (Fold4-41 sonolento: 6,4 s, fechamento de 3 min) vai como seta no limite
     for i, (_p, a, d) in enumerate(pares):
-        ax.plot([a, d], [i, i], color=GRADE, linewidth=2, solid_capstyle="round", zorder=1)
+        fora = d > XMAX
+        dx = XMAX / 1.03 if fora else d
+        ax.plot([a, dx], [i, i], color=GRADE, linewidth=2, solid_capstyle="round", zorder=1)
         ax.scatter([a], [i], s=36, color=AZUL_CLARO, edgecolors="white", linewidths=1.2, zorder=2)
-        ax.scatter([d], [i], s=36, color=AZUL_ESCURO, edgecolors="white", linewidths=1.2, zorder=3)
+        ax.scatter([dx], [i], s=40 if fora else 36, marker=">" if fora else "o", color=AZUL_ESCURO,
+                   edgecolors="white", linewidths=1.2, zorder=3)
+        if fora:
+            ax.text(XMAX / 1.12, i, f"{d / 1000:.1f} s".replace(".", ","), ha="right", va="center",
+                    fontsize=7, color=AZUL_ESCURO, zorder=4,
+                    bbox=dict(boxstyle="square,pad=0.15", facecolor="white", edgecolor="none"))
     # numeração da própria base (Fold1-01 -> 1), para casar com o texto
-    ax.set_yticks(range(len(pares)), [str(int(p.split("-")[1])) for p, _, _ in pares], fontsize=8)
+    ax.set_yticks(range(len(pares)), [str(int(p.split("-")[1])) for p, _, _ in pares], fontsize=8 if linha >= 0.2 else 6.5)
     ax.set_ylabel("Participante (numeração da base)")
     ax.invert_yaxis()
     ax.set_xscale("log")
     marcas = [50, 100, 200, 500, 1000, 2000]
     ax.set_xticks(marcas, [f"{m:,}".replace(",", ".") for m in marcas])   # 1.000, como no texto
     ax.minorticks_off()
-    ax.set_xlim(70, 2000)
+    ax.set_xlim(70, XMAX)
     ax.set_xlabel("Duração média da piscada (ms, escala logarítmica)")
     ax.grid(axis="y", visible=False)
     ax.spines["left"].set_visible(False)
