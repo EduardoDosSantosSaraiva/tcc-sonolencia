@@ -31,7 +31,6 @@ Saída: uta_rldd/resultados/<data_hora>/por_video.csv e relatorio.md
 
 import argparse
 import csv
-import itertools
 import sys
 import time
 from pathlib import Path
@@ -137,12 +136,21 @@ def wilcoxon_exato(d):
             j += 1
         postos[ordem[i:j + 1]] = (i + j) / 2 + 1
         i = j + 1
-    w = postos[d > 0].sum()
-    centro = postos.sum() / 2
-    todos = np.array([sum(p for p, s in zip(postos, sinais) if s)
-                      for sinais in itertools.product((0, 1), repeat=n)])
-    p = float(np.mean(np.abs(todos - centro) >= abs(w - centro) - 1e-9))
-    return n, p
+    # Distribuição exata de W sob H0 por programação dinâmica (cada posto entra
+    # com sinal + ou - com chance 1/2). Postos médios são múltiplos de 0,5, então
+    # trabalho com o dobro deles, que é inteiro. Enumerar as 2^n combinações
+    # (versão antiga) não termina com 52 pares.
+    dobro = np.rint(postos * 2).astype(int)
+    contagem = [1] + [0] * int(dobro.sum())   # contagem[k] = nº de subconjuntos com soma k
+    for r in dobro:
+        for k in range(len(contagem) - 1, r - 1, -1):
+            contagem[k] += contagem[k - r]
+    w2 = int(dobro[d > 0].sum())
+    centro2 = int(dobro.sum())                # 2 * centro, com centro = soma/2
+    # |2W - soma| >= |2w - soma|, tudo em inteiros (dobro): |2k - centro2| >= |2w2 - centro2|
+    extremos = sum(c for k, c in enumerate(contagem) if abs(2 * k - centro2) >= abs(2 * w2 - centro2))
+    p = extremos / 2 ** n
+    return n, float(p)
 
 
 # ------------------------------------------------------------------ relatório
