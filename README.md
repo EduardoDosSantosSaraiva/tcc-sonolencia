@@ -79,20 +79,43 @@ Ferramentas auxiliares:
 ## Estrutura
 
 ```
-core.py               métricas, máquina de estados, câmera, banco de dados
-eye_fatigue.py        aplicação principal, alarmes e modo de autoteste
-test_core.py          16 testes automatizados da lógica pura
-protocolo_testes.md   roteiro dos 8 cenários de validação
-autoteste_resultados/ relatórios gerados pelo autoteste guiado
-monografia/           texto do TCC e apuração dos dados da PRF
+core.py                 métricas, máquina de estados, câmera, banco de dados
+eye_fatigue.py          aplicação principal, alarmes e modo de autoteste
+interface.py            telas do monitoramento e do autoteste
+test_core.py            46 testes da lógica de decisão e do preparo da imagem
+test_interface.py       5 testes da interface
+protocolo_testes.md     roteiro dos 8 cenários de validação
+avaliar_yawdd.py        avaliação na base YawDD (bocejo e alarmes falsos)
+validacao_cruzada.py    validação cruzada por participante na YawDD
+verificar_regressao.py  confere se uma mudança nas regras piorou algum número
+uta_rldd/               avaliação com sono real na base UTA-RLDD
+benchmark.py            latência e taxa de quadros na placa
+autoteste_resultados/   relatórios gerados pelo autoteste guiado
+monografia/             texto do TCC, figuras e apuração dos dados da PRF
 ```
 
 ## Validação
 
-`protocolo_testes.md` define oito cenários — de referência, piscada normal,
-piscada longa, microssono, fala normal, bocejo, queda de cabeça e óculos escuros.
-O modo `--modo-teste` narra cada cenário por voz, avalia automaticamente se o
-sinal esperado foi detectado e salva o relatório em `autoteste_resultados/`.
+- **Testes automatizados:** `./venv/bin/python -m pytest` (51 testes).
+- **Protocolo guiado:** `protocolo_testes.md` define oito cenários: referência,
+  piscada normal, piscada longa, microssono, fala normal, bocejo, queda de cabeça
+  e óculos escuros. O `./autoteste.sh` narra cada cenário por voz, avalia
+  sozinho se o sinal esperado foi detectado e salva o relatório em
+  `autoteste_resultados/`.
+- **YawDD** (349 vídeos gravados em carro; 90 pessoas no conjunto Mirror e 29
+  no Dash): bocejo com
+  sensibilidade de 86,1% e precisão de 99,0%; alarmes de sono falsos caíram de
+  76 para 6 com as regras finais. A validação cruzada por participante dá F1 de
+  91,8%, contra 92,1% na base inteira.
+- **UTA-RLDD** (sono real autodeclarado, 52 pessoas com um vídeo alerta e um
+  com sono): a piscada ficou mais longa com sono em 49 das 52, e o sistema,
+  calibrado com a pessoa descansada, alertou em 39 dos 52 vídeos com sono,
+  contra 10 dos 52 alertas.
+- **Desempenho no Raspberry Pi 5:** 24,6 ms por quadro (36,9 quadros por
+  segundo), estável por 20 minutos a cerca de 60 °C.
+
+Os vídeos das bases não são redistribuídos aqui. Cada script explica como
+baixá-los, e os números completos estão no Capítulo 4 da monografia.
 
 ## Privacidade
 
@@ -101,3 +124,8 @@ gravadas apenas métricas numéricas. Quando o alarme dispara, uma foto do momen
 é salva em `alarme_snapshots/` como evidência para os testes — essa pasta **não é
 versionada**, por conter dado biométrico (LGPD, art. 5º, II). Para desligar o
 registro em banco, use `--no-log`.
+
+## Licença
+
+Código sob a licença MIT (arquivo `LICENSE`). As bases YawDD e UTA-RLDD têm
+termos próprios e devem ser obtidas nas fontes originais.
