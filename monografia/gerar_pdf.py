@@ -19,6 +19,7 @@ Uso:
     ../venv/bin/python gerar_pdf.py --tudo           # folhas pré-textuais + todos os capítulos
 """
 
+import html as html_mod
 import io
 import re
 import shutil
@@ -72,6 +73,19 @@ CSS = """
  .figura{text-align:center;margin:0}
  .figura svg,.figura img{width:100%;height:auto}
  th,td{border:1px solid #000;padding:3pt 4pt;text-align:left;vertical-align:top}
+ /* títulos sem indicativo numérico vão centralizados (ABNT NBR 14724) */
+ .refs h1,.lista h1{text-align:center}
+ .lista p{text-indent:0}
+ /* pontilhado: linha atrás do texto, que tem fundo branco; assim os pontos
+    começam onde o texto termina, mesmo quando a legenda quebra em 2 linhas */
+ .toc{position:relative;z-index:0;margin:0 0 5pt;padding-right:2.4em;text-align:left}
+ .toc::after{content:"";position:absolute;z-index:-1;left:0;right:2.2em;bottom:3.5pt;
+             border-bottom:1.2px dotted #000}
+ .toc .t{background:#fff;padding-right:3pt}
+ .toc .d{display:none}
+ .toc .p{position:absolute;right:0;bottom:0}
+ .toc.n1{font-weight:bold}
+ .toc.n2{padding-left:1.25cm}
 """
 
 TITULO_REFS = "<h1>REFERÊNCIAS BIBLIOGRÁFICAS</h1>"
@@ -140,6 +154,87 @@ def capa():
             f'</div>')
 
 
+def _limpo(fragmento):
+    """Texto puro de um trecho de HTML, com espaços normalizados."""
+    texto = html_mod.unescape(re.sub(r"<[^>]+>", "", fragmento))
+    return re.sub(r"\s+", " ", texto).strip()
+
+
+def itens_do_texto(capitulos_html):
+    """Capítulos (h1), seções (h2) e legendas de figuras e quadros, na ordem
+    em que aparecem. Cada item: (tipo, texto)."""
+    itens = []
+    padrao = (r'<h([12])[^>]*>(.*?)</h\1>'
+              r'|<p class="legenda">((?:Figura|Quadro) \d+:.*?)</p>')
+    for m in re.finditer(padrao, capitulos_html, re.S):
+        if m.group(1):
+            itens.append(("n" + m.group(1), _limpo(m.group(2))))
+        else:
+            texto = _limpo(m.group(3))
+            itens.append(("figura" if texto.startswith("Figura") else "quadro", texto))
+    itens.append(("n1", _limpo(TITULO_REFS)))
+    return itens
+
+
+def paginas_listas_e_sumario(itens, paginas):
+    """Lista de figuras, lista de quadros e sumário (nessa ordem, como pede a
+    ABNT NBR 14724), cada um em página própria. `paginas` traz o número de
+    página de cada item; na primeira passagem ainda não se sabe, vai 000."""
+    def linha(classe, texto, pagina):
+        texto = re.sub(r"(\S+-\S+)", r'<span style="white-space:nowrap">\1</span>',
+                       html_mod.escape(texto))          # não quebra "UTA-RLDD" no hífen
+        return (f'<div class="toc {classe}"><span class="t">{texto}</span>'
+                f'<span class="d"></span><span class="p">{pagina}</span></div>')
+
+    blocos = []
+    for tipo, titulo in (("figura", "LISTA DE FIGURAS"), ("quadro", "LISTA DE QUADROS")):
+        linhas = [linha("", t, paginas.get(i, "000")) for i, (k, t) in enumerate(itens) if k == tipo]
+        if linhas:
+            blocos.append(f'<div class="pagina lista"><h1>{titulo}</h1>{"".join(linhas)}</div>')
+    linhas = [linha(k, t, paginas.get(i, "000")) for i, (k, t) in enumerate(itens) if k in ("n1", "n2")]
+    blocos.append(f'<div class="pagina lista"><h1>SUMÁRIO</h1>{"".join(linhas)}</div>')
+    return blocos
+
+
+def localizar(pdf, itens):
+    """Acha no PDF a página de cada item, procurando a partir da primeira
+    página que começa com o título do primeiro capítulo (as listas e o
+    sumário vêm antes e repetem os mesmos textos). Devolve (índice da
+    página da Introdução, {item: número impresso})."""
+    from pypdf import PdfReader
+    textos = [re.sub(r"\s+", " ", p.extract_text() or "") for p in PdfReader(pdf).pages]
+    primeiro = next(t for k, t in itens if k == "n1")
+    inicio = next((i for i, t in enumerate(textos) if t.strip().startswith(primeiro)), None)
+    if inicio is None:
+        sys.exit(f"Não achei no PDF a página que começa com '{primeiro}'.")
+    paginas, atual = {}, inicio
+    for n, (_k, texto) in enumerate(itens):
+        achou = next((i for i in range(atual, len(textos)) if texto in textos[i]), None)
+        if achou is None:
+            print(f"  Aviso: não achei no PDF '{texto[:60]}'; usei a página do item anterior.")
+            achou = atual
+        paginas[n] = achou - inicio + 1
+        atual = achou
+    return inicio, paginas
+
+
+def imprimir(documento, saida, chromium):
+    with tempfile.TemporaryDirectory() as tmp:
+        fonte = Path(tmp) / "tcc.html"
+        fonte.write_text(documento)
+        subprocess.run(
+            [chromium, "--headless=new", "--disable-gpu", "--no-sandbox",
+             "--no-pdf-header-footer", f"--print-to-pdf={saida}", fonte.as_uri()],
+            check=True, capture_output=True, timeout=180)
+
+
+def montar(partes):
+    return ('<!doctype html>\n<html lang="pt-BR"><head><meta charset="utf-8">'
+            "<title>TCC</title>\n"
+            f"<style>{CSS}</style></head><body>\n"
+            + "\n".join(partes) + "\n</body></html>\n")
+
+
 def numerar(pdf, primeira=1, pular=0):
     """Carimba o número no alto à direita, como no TCC-modelo."""
     try:
@@ -198,6 +293,7 @@ def main():
                 partes.append(f'<div class="pagina capa{resumo}">{pagina}</div>')
     else:
         partes.append(capa())
+    n_pre = len(partes)      # folhas antes do texto; listas e sumário entram depois delas
 
     if not texto:
         # só a introdução, do jeito que foi entregue ao orientador
@@ -220,20 +316,27 @@ def main():
         partes.append(f'<div class="refs">{TITULO_REFS}'
                       + "".join(refs[n] for n in sorted(refs)) + "</div>")
 
-    documento = ('<!doctype html>\n<html lang="pt-BR"><head><meta charset="utf-8">'
-                 "<title>TCC</title>\n"
-                 f"<style>{CSS}</style></head><body>\n"
-                 + "\n".join(partes) + "\n</body></html>\n")
+    if tudo:
+        # Listas e sumário precisam das páginas, que só se sabem depois de
+        # imprimir: a 1ª passagem sai com 000 no lugar dos números, a 2ª com
+        # os números achados no PDF. Se a 2ª mudar a paginação, faz a 3ª.
+        itens = itens_do_texto("".join(textos))
+        paginas, inicio = {}, None
+        for _ in range(3):
+            imprimir(montar(partes[:n_pre] + paginas_listas_e_sumario(itens, paginas) + partes[n_pre:]),
+                     saida, chromium)
+            novo_inicio, novas = localizar(saida, itens)
+            if novas == paginas and novo_inicio == inicio:
+                break
+            inicio, paginas = novo_inicio, novas
+        else:
+            print("  Aviso: a paginação não estabilizou; confira os números do sumário.")
+        pular = inicio          # a Introdução é a página 1, como no TCC-modelo
+    else:
+        imprimir(montar(partes), saida, chromium)
+        pular = 1
 
-    with tempfile.TemporaryDirectory() as tmp:
-        fonte = Path(tmp) / "tcc.html"
-        fonte.write_text(documento)
-        subprocess.run(
-            [chromium, "--headless=new", "--disable-gpu", "--no-sandbox",
-             "--no-pdf-header-footer", f"--print-to-pdf={saida}", fonte.as_uri()],
-            check=True, capture_output=True, timeout=180)
-
-    numerar(saida, pular=1 if not tudo else 4)
+    numerar(saida, pular=pular)
     print(f"PDF gerado: {saida}")
     if DESKTOP.is_dir():
         shutil.copy(saida, DESKTOP / saida.name)
