@@ -107,10 +107,10 @@ monografia/             texto do TCC, figuras e apuração dos dados da PRF
   sensibilidade de 86,1% e precisão de 99,0%; alarmes de sono falsos caíram de
   76 para 6 com as regras finais. A validação cruzada por participante dá F1 de
   91,8%, contra 92,1% na base inteira.
-- **UTA-RLDD** (sono real autodeclarado, 52 pessoas com um vídeo alerta e um
-  com sono): a piscada ficou mais longa com sono em 49 das 52, e o sistema,
-  calibrado com a pessoa descansada, alertou em 39 dos 52 vídeos com sono,
-  contra 10 dos 52 alertas.
+- **UTA-RLDD** (sono real autodeclarado, 58 pessoas com um vídeo alerta e um
+  com sono): a piscada ficou mais longa com sono em 55 das 58, e o sistema,
+  calibrado com a pessoa descansada, alertou em 43 dos 58 vídeos com sono,
+  contra 10 dos 58 alertas.
 - **Desempenho no Raspberry Pi 5:** 24,6 ms por quadro (36,9 quadros por
   segundo), estável por 20 minutos a cerca de 60 °C.
 
