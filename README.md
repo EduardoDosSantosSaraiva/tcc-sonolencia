@@ -82,7 +82,7 @@ Ferramentas auxiliares:
 core.py                 métricas, máquina de estados, câmera, banco de dados
 eye_fatigue.py          aplicação principal, alarmes e modo de autoteste
 interface.py            telas do monitoramento e do autoteste
-test_core.py            46 testes da lógica de decisão e do preparo da imagem
+test_core.py            53 testes da lógica de decisão e do preparo da imagem
 test_interface.py       5 testes da interface
 protocolo_testes.md     roteiro dos 8 cenários de validação
 avaliar_yawdd.py        avaliação na base YawDD (bocejo e alarmes falsos)
@@ -96,7 +96,7 @@ monografia/             texto do TCC, figuras e apuração dos dados da PRF
 
 ## Validação
 
-- **Testes automatizados:** `./venv/bin/python -m pytest` (51 testes).
+- **Testes automatizados:** `./venv/bin/python -m pytest` (58 testes).
 - **Protocolo guiado:** `protocolo_testes.md` define oito cenários: referência,
   piscada normal, piscada longa, microssono, fala normal, bocejo, queda de cabeça
   e óculos escuros. O `./autoteste.sh` narra cada cenário por voz, avalia
@@ -109,8 +109,8 @@ monografia/             texto do TCC, figuras e apuração dos dados da PRF
   91,8%, contra 92,1% na base inteira.
 - **UTA-RLDD** (sono real autodeclarado, 58 pessoas com um vídeo alerta e um
   com sono): a piscada ficou mais longa com sono em 55 das 58, e o sistema,
-  calibrado com a pessoa descansada, alertou em 43 dos 58 vídeos com sono,
-  contra 10 dos 58 alertas.
+  calibrado com a pessoa descansada, alertou em 40 dos 58 vídeos com sono,
+  contra 8 dos 58 alertas.
 - **Desempenho no Raspberry Pi 5:** 24,6 ms por quadro (36,9 quadros por
   segundo), estável por 20 minutos a cerca de 60 °C.
 

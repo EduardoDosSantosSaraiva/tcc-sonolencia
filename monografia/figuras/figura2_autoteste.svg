@@ -6,7 +6,7 @@
   <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:date>2026-11-01T17:32:33.458573</dc:date>
+    <dc:date>2026-11-20T17:09:15.387303</dc:date>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
@@ -41,291 +41,306 @@ z
     <g id="xtick_1">
      <g id="line2d_1"/>
      <g id="text_1">
-      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(35.848595 139.914339)">09/09</text>
-      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(35.848595 148.077181)">15:32</text>
+      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(35.478618 139.914339)">09/09</text>
+      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(35.478618 148.077181)">15:32</text>
      </g>
     </g>
     <g id="xtick_2">
      <g id="line2d_2"/>
      <g id="text_2">
-      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(59.609325 139.914339)">09/09</text>
-      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(59.609325 148.077181)">15:37</text>
+      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(57.595007 139.914339)">09/09</text>
+      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(57.595007 148.077181)">15:37</text>
      </g>
     </g>
     <g id="xtick_3">
      <g id="line2d_3"/>
      <g id="text_3">
-      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(83.370055 139.914339)">09/09</text>
-      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(83.370055 148.077181)">15:44</text>
+      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(79.711396 139.914339)">09/09</text>
+      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(79.711396 148.077181)">15:44</text>
      </g>
     </g>
     <g id="xtick_4">
      <g id="line2d_4"/>
      <g id="text_4">
-      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(107.130785 139.914339)">09/09</text>
-      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(107.130785 148.077181)">15:52</text>
+      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(101.827785 139.914339)">09/09</text>
+      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(101.827785 148.077181)">15:52</text>
      </g>
     </g>
     <g id="xtick_5">
      <g id="line2d_5"/>
      <g id="text_5">
-      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(130.891515 139.914339)">09/09</text>
-      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(130.891515 148.077181)">15:57</text>
+      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(123.944173 139.914339)">09/09</text>
+      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(123.944173 148.077181)">15:57</text>
      </g>
     </g>
     <g id="xtick_6">
      <g id="line2d_6"/>
      <g id="text_6">
-      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(154.652245 139.914339)">09/09</text>
-      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(154.652245 148.077181)">16:04</text>
+      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(146.060562 139.914339)">09/09</text>
+      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(146.060562 148.077181)">16:04</text>
      </g>
     </g>
     <g id="xtick_7">
      <g id="line2d_7"/>
      <g id="text_7">
-      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(178.412975 139.914339)">09/09</text>
-      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(178.412975 148.077181)">16:09</text>
+      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(168.176951 139.914339)">09/09</text>
+      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(168.176951 148.077181)">16:09</text>
      </g>
     </g>
     <g id="xtick_8">
      <g id="line2d_8"/>
      <g id="text_8">
-      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(202.173705 139.914339)">23/09</text>
-      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(202.173705 148.077181)">12:03</text>
+      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(190.29334 139.914339)">23/09</text>
+      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(190.29334 148.077181)">12:03</text>
      </g>
     </g>
     <g id="xtick_9">
      <g id="line2d_9"/>
      <g id="text_9">
-      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(225.934435 139.914339)">23/09</text>
-      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(225.934435 148.077181)">12:19</text>
+      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(212.409729 139.914339)">23/09</text>
+      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(212.409729 148.077181)">12:19</text>
      </g>
     </g>
     <g id="xtick_10">
      <g id="line2d_10"/>
      <g id="text_10">
-      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(249.695165 139.914339)">30/09</text>
-      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(249.695165 148.077181)">13:16</text>
+      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(234.526117 139.914339)">30/09</text>
+      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(234.526117 148.077181)">13:16</text>
      </g>
     </g>
     <g id="xtick_11">
      <g id="line2d_11"/>
      <g id="text_11">
-      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(273.455895 139.914339)">30/09</text>
-      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(273.455895 148.077181)">13:34</text>
+      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(256.642506 139.914339)">30/09</text>
+      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(256.642506 148.077181)">13:34</text>
      </g>
     </g>
     <g id="xtick_12">
      <g id="line2d_12"/>
      <g id="text_12">
-      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(297.216625 139.914339)">30/09</text>
-      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(297.216625 148.077181)">13:49</text>
+      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(278.758895 139.914339)">30/09</text>
+      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(278.758895 148.077181)">13:49</text>
      </g>
     </g>
     <g id="xtick_13">
      <g id="line2d_13"/>
      <g id="text_13">
-      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(320.977355 139.914339)">20/10</text>
-      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(320.977355 148.077181)">13:46</text>
+      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(300.875284 139.914339)">20/10</text>
+      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(300.875284 148.077181)">13:46</text>
      </g>
     </g>
     <g id="xtick_14">
      <g id="line2d_14"/>
      <g id="text_14">
-      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(344.738085 139.914339)">30/10</text>
-      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(344.738085 148.077181)">14:56</text>
+      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(322.991673 139.914339)">30/10</text>
+      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(322.991673 148.077181)">14:56</text>
+     </g>
+    </g>
+    <g id="xtick_15">
+     <g id="line2d_15"/>
+     <g id="text_15">
+      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(345.386382 139.914339)">20/11</text>
+      <text style="font-size: 7.5px; font-family: 'Liberation Sans'; fill: #52514e" transform="translate(345.108061 148.077181)">16:36</text>
      </g>
     </g>
    </g>
    <g id="matplotlib.axis_2">
     <g id="ytick_1">
-     <g id="line2d_15">
+     <g id="line2d_16">
       <path d="M 23.906543 130.392 
 L 375.446543 130.392 
-" clip-path="url(#pe78049623c)" style="fill: none; stroke: #e4e3df; stroke-width: 0.8; stroke-linecap: square"/>
+" clip-path="url(#pf2de3f0654)" style="fill: none; stroke: #e4e3df; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
-     <g id="line2d_16"/>
-     <g id="text_15">
+     <g id="line2d_17"/>
+     <g id="text_16">
       <text style="font-size: 9px; font-family: 'Liberation Sans'; text-anchor: end; fill: #52514e" x="20.406543" y="133.668123" transform="rotate(-0 20.406543 133.668123)">0</text>
      </g>
     </g>
     <g id="ytick_2">
-     <g id="line2d_17">
+     <g id="line2d_18">
       <path d="M 23.906543 101.737618 
 L 375.446543 101.737618 
-" clip-path="url(#pe78049623c)" style="fill: none; stroke: #e4e3df; stroke-width: 0.8; stroke-linecap: square"/>
+" clip-path="url(#pf2de3f0654)" style="fill: none; stroke: #e4e3df; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
-     <g id="line2d_18"/>
-     <g id="text_16">
+     <g id="line2d_19"/>
+     <g id="text_17">
       <text style="font-size: 9px; font-family: 'Liberation Sans'; text-anchor: end; fill: #52514e" x="20.406543" y="105.013741" transform="rotate(-0 20.406543 105.013741)">2</text>
      </g>
     </g>
     <g id="ytick_3">
-     <g id="line2d_19">
+     <g id="line2d_20">
       <path d="M 23.906543 73.083236 
 L 375.446543 73.083236 
-" clip-path="url(#pe78049623c)" style="fill: none; stroke: #e4e3df; stroke-width: 0.8; stroke-linecap: square"/>
+" clip-path="url(#pf2de3f0654)" style="fill: none; stroke: #e4e3df; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
-     <g id="line2d_20"/>
-     <g id="text_17">
+     <g id="line2d_21"/>
+     <g id="text_18">
       <text style="font-size: 9px; font-family: 'Liberation Sans'; text-anchor: end; fill: #52514e" x="20.406543" y="76.359359" transform="rotate(-0 20.406543 76.359359)">4</text>
      </g>
     </g>
     <g id="ytick_4">
-     <g id="line2d_21">
+     <g id="line2d_22">
       <path d="M 23.906543 44.428854 
 L 375.446543 44.428854 
-" clip-path="url(#pe78049623c)" style="fill: none; stroke: #e4e3df; stroke-width: 0.8; stroke-linecap: square"/>
+" clip-path="url(#pf2de3f0654)" style="fill: none; stroke: #e4e3df; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
-     <g id="line2d_22"/>
-     <g id="text_18">
+     <g id="line2d_23"/>
+     <g id="text_19">
       <text style="font-size: 9px; font-family: 'Liberation Sans'; text-anchor: end; fill: #52514e" x="20.406543" y="47.704977" transform="rotate(-0 20.406543 47.704977)">6</text>
      </g>
     </g>
     <g id="ytick_5">
-     <g id="line2d_23">
+     <g id="line2d_24">
       <path d="M 23.906543 15.774472 
 L 375.446543 15.774472 
-" clip-path="url(#pe78049623c)" style="fill: none; stroke: #e4e3df; stroke-width: 0.8; stroke-linecap: square"/>
+" clip-path="url(#pf2de3f0654)" style="fill: none; stroke: #e4e3df; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
-     <g id="line2d_24"/>
-     <g id="text_19">
+     <g id="line2d_25"/>
+     <g id="text_20">
       <text style="font-size: 9px; font-family: 'Liberation Sans'; text-anchor: end; fill: #52514e" x="20.406543" y="19.050595" transform="rotate(-0 20.406543 19.050595)">8</text>
      </g>
     </g>
-    <g id="text_20">
+    <g id="text_21">
      <text style="font-size: 9px; font-family: 'Liberation Sans'; text-anchor: middle; fill: #52514e" x="9.507656" y="66.636" transform="rotate(-90 9.507656 66.636)">Cenários aprovados (de 8)</text>
     </g>
    </g>
    <g id="patch_3">
     <path d="M 39.885634 130.392 
-L 50.577962 130.392 
-L 50.577962 87.410427 
+L 49.838009 130.392 
+L 49.838009 87.410427 
 L 39.885634 87.410427 
 z
-" clip-path="url(#pe78049623c)" style="fill: #2a78d6"/>
+" clip-path="url(#pf2de3f0654)" style="fill: #2a78d6"/>
    </g>
    <g id="patch_4">
-    <path d="M 63.646364 130.392 
-L 74.338692 130.392 
-L 74.338692 87.410427 
-L 63.646364 87.410427 
+    <path d="M 62.002023 130.392 
+L 71.954398 130.392 
+L 71.954398 87.410427 
+L 62.002023 87.410427 
 z
-" clip-path="url(#pe78049623c)" style="fill: #2a78d6"/>
+" clip-path="url(#pf2de3f0654)" style="fill: #2a78d6"/>
    </g>
    <g id="patch_5">
-    <path d="M 87.407094 130.392 
-L 98.099422 130.392 
-L 98.099422 73.083236 
-L 87.407094 73.083236 
+    <path d="M 84.118411 130.392 
+L 94.070786 130.392 
+L 94.070786 73.083236 
+L 84.118411 73.083236 
 z
-" clip-path="url(#pe78049623c)" style="fill: #2a78d6"/>
+" clip-path="url(#pf2de3f0654)" style="fill: #2a78d6"/>
    </g>
    <g id="patch_6">
-    <path d="M 111.167824 130.392 
-L 121.860152 130.392 
-L 121.860152 44.428854 
-L 111.167824 44.428854 
+    <path d="M 106.2348 130.392 
+L 116.187175 130.392 
+L 116.187175 44.428854 
+L 106.2348 44.428854 
 z
-" clip-path="url(#pe78049623c)" style="fill: #2a78d6"/>
+" clip-path="url(#pf2de3f0654)" style="fill: #2a78d6"/>
    </g>
    <g id="patch_7">
-    <path d="M 134.928554 130.392 
-L 145.620882 130.392 
-L 145.620882 44.428854 
-L 134.928554 44.428854 
+    <path d="M 128.351189 130.392 
+L 138.303564 130.392 
+L 138.303564 44.428854 
+L 128.351189 44.428854 
 z
-" clip-path="url(#pe78049623c)" style="fill: #2a78d6"/>
+" clip-path="url(#pf2de3f0654)" style="fill: #2a78d6"/>
    </g>
    <g id="patch_8">
-    <path d="M 158.689284 130.392 
-L 169.381612 130.392 
-L 169.381612 30.101663 
-L 158.689284 30.101663 
+    <path d="M 150.467578 130.392 
+L 160.419953 130.392 
+L 160.419953 30.101663 
+L 150.467578 30.101663 
 z
-" clip-path="url(#pe78049623c)" style="fill: #2a78d6"/>
+" clip-path="url(#pf2de3f0654)" style="fill: #2a78d6"/>
    </g>
    <g id="patch_9">
-    <path d="M 182.450014 130.392 
-L 193.142342 130.392 
-L 193.142342 44.428854 
-L 182.450014 44.428854 
+    <path d="M 172.583967 130.392 
+L 182.536342 130.392 
+L 182.536342 44.428854 
+L 172.583967 44.428854 
 z
-" clip-path="url(#pe78049623c)" style="fill: #2a78d6"/>
+" clip-path="url(#pf2de3f0654)" style="fill: #2a78d6"/>
    </g>
    <g id="patch_10">
-    <path d="M 206.210744 130.392 
-L 216.903072 130.392 
-L 216.903072 30.101663 
-L 206.210744 30.101663 
+    <path d="M 194.700355 130.392 
+L 204.65273 130.392 
+L 204.65273 30.101663 
+L 194.700355 30.101663 
 z
-" clip-path="url(#pe78049623c)" style="fill: #2a78d6"/>
+" clip-path="url(#pf2de3f0654)" style="fill: #2a78d6"/>
    </g>
    <g id="patch_11">
-    <path d="M 229.971474 130.392 
-L 240.663802 130.392 
-L 240.663802 73.083236 
-L 229.971474 73.083236 
+    <path d="M 216.816744 130.392 
+L 226.769119 130.392 
+L 226.769119 73.083236 
+L 216.816744 73.083236 
 z
-" clip-path="url(#pe78049623c)" style="fill: #2a78d6"/>
+" clip-path="url(#pf2de3f0654)" style="fill: #2a78d6"/>
    </g>
    <g id="patch_12">
-    <path d="M 253.732204 130.392 
-L 264.424532 130.392 
-L 264.424532 30.101663 
-L 253.732204 30.101663 
+    <path d="M 238.933133 130.392 
+L 248.885508 130.392 
+L 248.885508 30.101663 
+L 238.933133 30.101663 
 z
-" clip-path="url(#pe78049623c)" style="fill: #2a78d6"/>
+" clip-path="url(#pf2de3f0654)" style="fill: #2a78d6"/>
    </g>
    <g id="patch_13">
-    <path d="M 277.492934 130.392 
-L 288.185262 130.392 
-L 288.185262 30.101663 
-L 277.492934 30.101663 
+    <path d="M 261.049522 130.392 
+L 271.001897 130.392 
+L 271.001897 30.101663 
+L 261.049522 30.101663 
 z
-" clip-path="url(#pe78049623c)" style="fill: #2a78d6"/>
+" clip-path="url(#pf2de3f0654)" style="fill: #2a78d6"/>
    </g>
    <g id="patch_14">
-    <path d="M 301.253664 130.392 
-L 311.945992 130.392 
-L 311.945992 15.774472 
-L 301.253664 15.774472 
+    <path d="M 283.165911 130.392 
+L 293.118286 130.392 
+L 293.118286 15.774472 
+L 283.165911 15.774472 
 z
-" clip-path="url(#pe78049623c)" style="fill: #2a78d6"/>
+" clip-path="url(#pf2de3f0654)" style="fill: #2a78d6"/>
    </g>
    <g id="patch_15">
-    <path d="M 325.014394 130.392 
-L 335.706722 130.392 
-L 335.706722 15.774472 
-L 325.014394 15.774472 
+    <path d="M 305.282299 130.392 
+L 315.234674 130.392 
+L 315.234674 15.774472 
+L 305.282299 15.774472 
 z
-" clip-path="url(#pe78049623c)" style="fill: #2a78d6"/>
+" clip-path="url(#pf2de3f0654)" style="fill: #2a78d6"/>
    </g>
    <g id="patch_16">
-    <path d="M 348.775124 130.392 
-L 359.467452 130.392 
-L 359.467452 30.101663 
-L 348.775124 30.101663 
+    <path d="M 327.398688 130.392 
+L 337.351063 130.392 
+L 337.351063 30.101663 
+L 327.398688 30.101663 
 z
-" clip-path="url(#pe78049623c)" style="fill: #2a78d6"/>
+" clip-path="url(#pf2de3f0654)" style="fill: #2a78d6"/>
    </g>
    <g id="patch_17">
+    <path d="M 349.515077 130.392 
+L 359.467452 130.392 
+L 359.467452 15.774472 
+L 349.515077 15.774472 
+z
+" clip-path="url(#pf2de3f0654)" style="fill: #2a78d6"/>
+   </g>
+   <g id="patch_18">
     <path d="M 23.906543 130.392 
 L 23.906543 2.88 
 " style="fill: none; stroke: #e4e3df; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
    </g>
-   <g id="patch_18">
+   <g id="patch_19">
     <path d="M 23.906543 130.392 
 L 375.446543 130.392 
 " style="fill: none; stroke: #e4e3df; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
    </g>
-   <g id="text_21">
-    <text style="font-size: 9px; font-family: 'Liberation Sans'; text-anchor: middle; fill: #0b0b0b" x="354.121288" y="25.20762" transform="rotate(-0 354.121288 25.20762)">7/8</text>
+   <g id="text_22">
+    <text style="font-size: 9px; font-family: 'Liberation Sans'; text-anchor: middle; fill: #0b0b0b" x="354.491265" y="10.880429" transform="rotate(-0 354.491265 10.880429)">8/8</text>
    </g>
   </g>
  </g>
  <defs>
-  <clipPath id="pe78049623c">
+  <clipPath id="pf2de3f0654">
    <rect x="23.906543" y="2.88" width="351.54" height="127.512"/>
   </clipPath>
  </defs>
