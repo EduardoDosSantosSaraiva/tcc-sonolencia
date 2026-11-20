@@ -590,3 +590,97 @@ def test_video_file_source_nao_estica_video_em_pe(tmp_path):
     assert src.tamanho_original == (360, 640)
     assert disp.shape[:2] == (640, 360)
     assert abs(iw / ih - 360 / 640) < 0.01 and infer.shape[:2] == (ih, iw)
+
+
+# ---------------------------------------------------------------------------
+# Referência do olho aberto que acompanha a luz e avisos sem repetição (18/11)
+# ---------------------------------------------------------------------------
+
+def _estado_calibrado(ear_b=0.30):
+    return core.DrowsinessState(ear_threshold=ear_b * core.CLOSED_RATIO,
+                                ear_almost_closed=ear_b * core.ALMOST_RATIO,
+                                perclos_ear_threshold=ear_b * core.PERCLOS_CLOSED_RATIO,
+                                ear_baseline=ear_b)
+
+
+def _alimentar(state, ear, t0, t1, fps=30):
+    st, t = None, t0
+    while t < t1:
+        st = state.update(ear, ear, 0.0, None, True, t)
+        t += 1 / fps
+    return st, t
+
+
+def test_olho_apertado_no_claro_nao_vira_alarme_mas_fechar_ainda_vira():
+    """Calibrado com o olho bem aberto (0,30) e depois no claro, com o olho
+    aberto em 0,24 (80%): um trecho em 0,19 (63%, abaixo dos 70% do
+    'fechado' da calibração) não pode dar alarme; fechar de verdade, sim."""
+    state = _estado_calibrado()
+    st, t = _alimentar(state, 0.24, 0.0, 40.0)
+    assert state.escala_olho == pytest.approx(0.80)
+    assert st["level"] == "aberto"                      # nem semicerrado
+    st, t = _alimentar(state, 0.19, t, t + 3.0)
+    assert st["level"] != "fechado"
+    st, t = _alimentar(state, 0.24, t, t + 2.0)
+    st, t = _alimentar(state, 0.06, t, t + 2.0)
+    assert st["level"] == "fechado"
+
+
+def test_referencia_do_olho_nao_desce_abaixo_do_piso():
+    """O sono real também abaixa o olho aberto: a referência para no piso e
+    não 'aprende' o olho pesado."""
+    state = _estado_calibrado()
+    _alimentar(state, 0.12, 0.0, 70.0)
+    assert state.escala_olho == pytest.approx(core.OPEN_REF_FLOOR)
+    assert state.ear_threshold == pytest.approx(0.30 * core.CLOSED_RATIO * core.OPEN_REF_FLOOR)
+
+
+def test_referencia_so_desce_e_espera_historico():
+    state = _estado_calibrado()
+    _alimentar(state, 0.36, 0.0, 40.0)                  # olho mais aberto que na calibração
+    assert state.escala_olho == 1.0
+    state = _estado_calibrado()
+    _alimentar(state, 0.24, 0.0, core.OPEN_REF_MIN_SECONDS - 2)
+    assert state.escala_olho == 1.0                     # pouco histórico: não mexe ainda
+
+
+def test_semicerrado_so_aparece_depois_de_alguns_segundos():
+    state = _estado_calibrado()
+    st, t = _alimentar(state, 0.30, 0.0, 5.0)
+    st, t = _alimentar(state, 0.24, t, t + 1.0)         # 80%: semicerrado há 1 s
+    assert st["level"] == "aberto"
+    st, t = _alimentar(state, 0.24, t, t + core.SEMI_SECONDS)
+    assert st["level"] == "atencao" and "semicerrados" in st["status"]
+
+
+def test_aviso_leve_toca_com_motivo_novo_e_nao_repete_sem_ele():
+    aviso = core.AvisoLeve(intervalo_s=10.0, repete_s=60.0)
+    assert aviso.tocar(True, (3, 0, 0), 0.0) is True
+    # motivo continua ativo, nada novo: antes repetia a cada 10 s
+    assert not any(aviso.tocar(True, (3, 0, 0), t) for t in range(1, 60))
+    assert aviso.tocar(True, (3, 0, 0), 60.0) is True    # repete_s
+    # motivo novo logo depois do aviso (até 10 s) já foi coberto por ele
+    assert aviso.tocar(True, (4, 0, 0), 65.0) is False
+    assert aviso.tocar(True, (4, 0, 0), 75.0) is False
+    # motivo novo depois do intervalo: toca
+    assert aviso.tocar(True, (5, 0, 0), 80.0) is True
+    # inativo nunca toca
+    assert aviso.tocar(False, (6, 0, 0), 100.0) is False
+
+
+def test_aviso_de_fadiga_toca_uma_vez_por_bocejo():
+    """Com 3+ bocejos em 5 min o 'bocejos frequentes' fica ativo até 5 min;
+    o aviso só toca de novo com bocejo novo (repete_s=None)."""
+    aviso = core.AvisoLeve(intervalo_s=10.0)
+    assert aviso.tocar(True, (3, 3), 0.0) is True
+    assert not any(aviso.tocar(True, (3, 3), t) for t in range(1, 300))
+    assert aviso.tocar(True, (4, 3), 300.0) is True
+
+
+def test_marcadores_dos_avisos_contam_piscadas_longas():
+    state = core.DrowsinessState(ear_threshold=0.21, ear_almost_closed=0.26, smoothing_window=1)
+    st = state.update(0.3, 0.3, 0.0, None, True, 0.0)
+    antes = st["marcador_atencao"]
+    state.update(0.1, 0.1, 0.0, None, True, 1.0)
+    st = state.update(0.3, 0.3, 0.0, None, True, 1.8)    # fechado 0,8 s: piscada longa
+    assert st["marcador_atencao"][0] == antes[0] + 1

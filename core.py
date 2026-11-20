@@ -51,6 +51,26 @@ CLOSED_RATIO = 0.70                # limiar "fechado" = baseline calibrado * ess
                                     # de olho fechado de verdade, então o limiar
                                     # precisa de uma margem maior)
 ALMOST_RATIO = 0.85                # limiar "quase fechado" = baseline * essa fração
+SEMI_SECONDS = 2.0                 # olho semicerrado só vira "atenção" na tela depois
+                                    # desse tempo seguido (antes acendia na hora, com
+                                    # qualquer olhar apertado)
+
+# Referência do olho aberto que acompanha o momento (18/11/2026). A calibração
+# mede o olho aberto uma vez só; se a luz muda depois (sol no rosto), o olho
+# aberto normal fica mais apertado e passa a parecer "semicerrado" ou até
+# "fechado": numa sessão ao vivo no claro o olho aberto ficou em 72-90% do
+# calibrado, com trechos de 63-69% que deram alarme cheio sem o olho fechar.
+# Por isso os limiares (fechado, semicerrado, PERCLOS) acompanham o olho aberto
+# típico do último minuto (percentil 75 do EAR: piscadas e fechamentos ficam
+# abaixo dele), só para baixo e até um piso. O piso existe porque o sono real
+# também abaixa o olho aberto (UTA-RLDD: 7% na mediana, 21% ou mais em 1 de
+# cada 10 pessoas): a referência não pode descer até "aprender" o sono. Um
+# fechamento de verdade fica abaixo de 50% do calibrado, longe do piso.
+OPEN_REF_WINDOW_SECONDS = 60
+OPEN_REF_PERCENTILE = 75
+OPEN_REF_FLOOR = 0.80              # a referência desce no máximo até essa fração do calibrado
+OPEN_REF_MIN_SECONDS = 20          # histórico mínimo de rosto antes de mexer na referência
+OPEN_REF_UPDATE_SECONDS = 1.0      # recalcula uma vez por segundo
 
 CLOSED_SECONDS_ALERT = 1.5    # tempo contínuo de olho fechado para soar alerta
 
@@ -866,6 +886,7 @@ class DrowsinessState:
         mar_smoothing_window=MAR_SMOOTHING_WINDOW,
         no_face_grace=NO_FACE_GRACE_SECONDS,
         smile_baseline=None,
+        ear_baseline=None,
     ):
         self.ear_threshold = ear_threshold
         self.ear_almost_closed = ear_almost_closed
@@ -873,6 +894,20 @@ class DrowsinessState:
             perclos_ear_threshold if perclos_ear_threshold is not None
             else ear_threshold * PERCLOS_CLOSED_RATIO / CLOSED_RATIO
         )
+        # limiares da calibração; os de cima são eles vezes escala_olho (ver
+        # OPEN_REF_*). Sem ear_baseline (sem calibração) a escala fica em 1
+        self.ear_baseline = ear_baseline
+        self._limiares_calibrados = (self.ear_threshold, self.ear_almost_closed, self.perclos_ear_threshold)
+        self.escala_olho = 1.0
+        self.ear_recente = deque()      # (t, EAR médio) do último OPEN_REF_WINDOW_SECONDS
+        self._t_escala = None
+        self.almost_since = None        # início do trecho seguido de olho semicerrado
+        # o que já aconteceu desde o início, para o aviso sonoro saber se há
+        # motivo novo (ver AvisoLeve)
+        self.quedas_vistas = 0          # quedas de cabeça que chegaram a HEAD_DOWN_SECONDS_ALERT
+        self.bocejos_vistos = 0         # bocejos que chegaram à duração de aviso
+        self.perclos_altas = 0          # vezes que o PERCLOS passou do limite
+        self._em_queda = self._em_bocejo = self._perclos_alto = False
         self.mar_threshold = mar_threshold
         self.mar_sustain_threshold = (
             mar_sustain_threshold if mar_sustain_threshold is not None
@@ -923,7 +958,31 @@ class DrowsinessState:
         st["distraido"] = sem_rosto is not None and DISTRACTION_SECONDS <= sem_rosto < DISTRACTION_MAX_SECONDS
         if st["distraido"]:
             st["status"] = f"SEM ROSTO ha {sem_rosto:.0f}s: OLHE PARA A ESTRADA"
+        # muda quando aparece motivo novo para cada aviso leve (ver AvisoLeve)
+        st["marcador_atencao"] = (self.long_blink_tracker.total, self.quedas_vistas, self.perclos_altas)
+        st["marcador_fadiga"] = (self.bocejos_vistos, self.yawn_events.total)
+        st["escala_olho"] = self.escala_olho
         return st
+
+    def _acompanhar_olho_aberto(self, t, ear):
+        """Atualiza a referência do olho aberto (ver OPEN_REF_*) e os limiares
+        que dependem dela."""
+        if not self.ear_baseline:
+            return
+        self.ear_recente.append((t, ear))
+        while self.ear_recente and self.ear_recente[0][0] < t - OPEN_REF_WINDOW_SECONDS:
+            self.ear_recente.popleft()
+        if self._t_escala is not None and t - self._t_escala < OPEN_REF_UPDATE_SECONDS:
+            return
+        self._t_escala = t
+        if self.ear_recente[-1][0] - self.ear_recente[0][0] < OPEN_REF_MIN_SECONDS:
+            return
+        nivel = float(np.percentile([e for _t, e in self.ear_recente], OPEN_REF_PERCENTILE))
+        self.escala_olho = min(1.0, max(OPEN_REF_FLOOR, nivel / self.ear_baseline))
+        fechado, semi, perclos = self._limiares_calibrados
+        self.ear_threshold = fechado * self.escala_olho
+        self.ear_almost_closed = semi * self.escala_olho
+        self.perclos_ear_threshold = perclos * self.escala_olho
 
     def _update(self, left_ear, right_ear, mar, head_pitch, face_detected, t, jaw_open=None,
                 smile=None):
@@ -936,9 +995,15 @@ class DrowsinessState:
             # (reflexo de óculos, blink parcial captado no meio do gesto)
             l_med = float(np.median([v[0] for v in self.ear_smooth]))
             r_med = float(np.median([v[1] for v in self.ear_smooth]))
+            self._acompanhar_olho_aberto(t, (l_med + r_med) / 2.0)
 
             both_closed = l_med < self.ear_threshold and r_med < self.ear_threshold
             both_almost = l_med < self.ear_almost_closed and r_med < self.ear_almost_closed
+            if both_almost:
+                if self.almost_since is None:
+                    self.almost_since = t
+            else:
+                self.almost_since = None
             closed_dur = None
 
             # Calculado antes do estado do olho de propósito: bocejar fecha
@@ -1023,7 +1088,7 @@ class DrowsinessState:
                     if LONG_BLINK_SECONDS <= blink_dur < closed_alert_s and not yawn_related and not sorrindo:
                         self.long_blink_tracker.record(t)
                 self.closed_since = None
-                if both_almost:
+                if both_almost and t - self.almost_since >= SEMI_SECONDS:
                     level = "atencao"
                     status = "ATENCAO: olhos semicerrados"
                     color = (0, 255, 255)
@@ -1056,6 +1121,18 @@ class DrowsinessState:
             if is_head_down:
                 self.last_head_down_t = t
             head_down_dur, head_down_count_recent = self.head_down_tracker.update(is_head_down, t)
+
+            # contadores de "motivo novo" para os avisos sonoros (AvisoLeve)
+            em_queda = head_down_dur is not None and head_down_dur >= HEAD_DOWN_SECONDS_ALERT
+            self.quedas_vistas += em_queda and not self._em_queda
+            self._em_queda = em_queda
+            em_bocejo = yawn_dur is not None
+            self.bocejos_vistos += em_bocejo and not self._em_bocejo
+            self._em_bocejo = em_bocejo
+            perclos_alto = (perclos_value >= PERCLOS_ALERT_RATIO
+                            and self.perclos_tracker.coverage() >= PERCLOS_MIN_COVERAGE_SECONDS)
+            self.perclos_altas += perclos_alto and not self._perclos_alto
+            self._perclos_alto = perclos_alto
 
             atencao_by_blinks = False
             atencao_by_yawn = both_closed and yawn_related
@@ -1172,7 +1249,10 @@ class DrowsinessState:
                          and t - self.last_head_down_t <= self.no_face_grace + HEAD_DROP_FACE_LOSS_SECONDS)
         if caiu_pra_fora and self.head_down_tracker.freq.count(t) == antes:
             self.head_down_tracker.freq.record(t)
+            self.quedas_vistas += not self._em_queda   # a parte visível foi curta: queda nova
         self.last_head_down_t = None
+        self._em_queda = self._em_bocejo = False
+        self.almost_since = None
         return {
             "status": "SEM ROSTO", "color": (128, 128, 128), "level": "sem_rosto",
             "ear_left": None, "ear_right": None, "ear_avg": None,
@@ -1197,11 +1277,13 @@ class EventFrequencyTracker:
         self.window_seconds = window_seconds
         self.min_interval = min_interval   # registro mais perto que isso do último é o mesmo evento
         self.events = deque()  # timestamps dos eventos
+        self.total = 0         # eventos desde o início (não sai da janela)
 
     def record(self, t):
         if self.events and t - self.events[-1] < self.min_interval:
             return
         self.events.append(t)
+        self.total += 1
         self._trim(t)
 
     def count(self, t):
@@ -1313,6 +1395,40 @@ class PerclosTracker:
             pts[i + 1][0] - pts[i][0] for i in range(len(pts) - 1) if pts[i][1]
         )
         return closed_time / total
+
+
+class AvisoLeve:
+    """Decide quando um aviso leve (atenção, fadiga) toca. O alarme cheio não
+    passa por aqui: ele repete enquanto o olho estiver fechado.
+
+    Antes o aviso repetia a cada 10 s enquanto o motivo durasse, e motivo de
+    frequência dura muito: 3 piscadas longas mantêm o "piscadas frequentes"
+    por até 2 min e 3 bocejos o "bocejos frequentes" por até 5 min, com o
+    aviso tocando o tempo todo sem nada novo acontecer. Agora toca quando o
+    motivo aparece e de novo só se chegar motivo novo (marcador mudou: nova
+    piscada longa, queda, bocejo, PERCLOS cruzando o limite) ou, se
+    repete_s não for None, depois de repete_s com o motivo ainda ativo.
+    Motivo novo que chega até intervalo_s depois de um aviso já foi coberto
+    por ele (o mesmo bocejo conta ao chegar a 1,5 s e ao terminar)."""
+
+    def __init__(self, intervalo_s=10.0, repete_s=None):
+        self.intervalo_s = intervalo_s
+        self.repete_s = repete_s
+        self.t_ultimo = None
+        self.anunciado = None
+
+    def tocar(self, ativo, marcador, t):
+        if self.t_ultimo is not None and t - self.t_ultimo < self.intervalo_s:
+            self.anunciado = marcador
+            return False
+        if not ativo:
+            return False
+        if (self.t_ultimo is None or marcador != self.anunciado
+                or (self.repete_s is not None and t - self.t_ultimo >= self.repete_s)):
+            self.t_ultimo = t
+            self.anunciado = marcador
+            return True
+        return False
 
 
 # ---------------------------------------------------------------------------

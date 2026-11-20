@@ -78,6 +78,10 @@ ATTENTION_REPEAT_SECONDS = 10.0   # aviso mais leve (piscadas longas frequentes,
                                     # que o alarme cheio pra não ficar irritante
 
 FATIGUE_SOUND_PATH = Path(__file__).parent / "aviso_fadiga.wav"
+ATTENTION_REPEAT_IDLE_SECONDS = 60.0   # sem motivo novo, o aviso de atenção só
+                                        # repete depois disso (ver core.AvisoLeve);
+                                        # o de fadiga não repete sem bocejo novo
+
 FATIGUE_REPEAT_SECONDS = 10.0   # aviso específico de bocejo — nunca dispara
                                   # o alarme cheio (ver core.DrowsinessState),
                                   # só esse aviso leve de fadiga/cansaço
@@ -955,6 +959,9 @@ def run_live_monitoring(source, landmarker, state, cv2, MpImage, MpImageFormat, 
     consecutive_errors = 0
     prev_wall = time.time()
     prev_level = None
+    # quando cada aviso leve toca (motivo novo, não a cada 10 s; ver core.AvisoLeve)
+    aviso_atencao = core.AvisoLeve(ATTENTION_REPEAT_SECONDS, ATTENTION_REPEAT_IDLE_SECONDS)
+    aviso_fadiga = core.AvisoLeve(FATIGUE_REPEAT_SECONDS)
     prev_blink_count = 0
     prev_yawn_count = 0
     prev_head_down_count = 0
@@ -1003,12 +1010,14 @@ def run_live_monitoring(source, landmarker, state, cv2, MpImage, MpImageFormat, 
 
             if alert_player:
                 alert_player.maybe_play(st["level"] == "fechado", t)
+            tocar_atencao = aviso_atencao.tocar(
+                st["atencao_by_blinks"] or st["atencao_by_head"] or st["atencao_by_perclos"],
+                st["marcador_atencao"], t)
+            tocar_fadiga = aviso_fadiga.tocar(st["atencao_by_yawn"], st["marcador_fadiga"], t)
             if attention_player:
-                attention_player.maybe_play(
-                    st["atencao_by_blinks"] or st["atencao_by_head"] or st["atencao_by_perclos"], t
-                )
+                attention_player.maybe_play(tocar_atencao, t)
             if fatigue_player:
-                fatigue_player.maybe_play(st["atencao_by_yawn"], t)
+                fatigue_player.maybe_play(tocar_fadiga, t)
             if distraction_player:
                 distraction_player.maybe_play(st["distraido"], t)
             fone_caiu = audio_monitor is not None and audio_monitor.fone_ok is False
@@ -1102,7 +1111,7 @@ def build_state(ear_baseline, mar_baseline, pitch_baseline, smile_baseline=None)
         ear_threshold=ear_threshold, ear_almost_closed=ear_almost_closed,
         perclos_ear_threshold=ear_baseline * core.PERCLOS_CLOSED_RATIO if ear_baseline else None,
         mar_threshold=mar_threshold, head_pitch_threshold=head_pitch_threshold,
-        smile_baseline=smile_baseline,
+        smile_baseline=smile_baseline, ear_baseline=ear_baseline,
     )
 
 

@@ -699,7 +699,9 @@ class Interface:
             f"Pitch  {f(st.get('head_pitch'))}   PERCLOS {info['perclos'] * 100:.0f}%",
         ]
         if lim is not None:
+            escala = getattr(lim, "escala_olho", 1.0)
             linhas.append(f"Limiares  fechado {f(lim.ear_threshold)}  semi {f(lim.ear_almost_closed)}")
+            linhas.append(f"Ref. olho aberto  {escala * 100:.0f}% do calibrado")
             linhas.append(f"bocejo {f(lim.mar_threshold)}  cabeça "
                           + (f(lim.head_pitch_threshold) if lim.head_pitch_threshold is not None else "desligada"))
         if info["fps"] is not None:

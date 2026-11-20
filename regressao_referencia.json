@@ -5,9 +5,9 @@
   "bocejos_falsos": 1,
   "dash_com_bocejo": 28,
   "alarmes_falsos": 6,
-  "avisos_falsos": 17,
-  "alarmes_reais": 86,
-  "alarmes_reais_mantidos": 65
+  "avisos_falsos": 10,
+  "alarmes_reais": 95,
+  "alarmes_reais_mantidos": 69
  },
  "por_video": {
   "Dash/Female/1-FemaleNoGlasses.avi": {
@@ -33,7 +33,7 @@
   "Dash/Female/13-FemaleGlasses.avi.avi": {
    "bocejos": 2,
    "alarmes": 0,
-   "avisos": 7
+   "avisos": 3
   },
   "Dash/Female/2-FemaleNoGlasses.avi": {
    "bocejos": 2,
@@ -128,7 +128,7 @@
   "Dash/Male/4-MaleNoGlasses.avi": {
    "bocejos": 2,
    "alarmes": 2,
-   "avisos": 4
+   "avisos": 1
   },
   "Dash/Male/5-MaleGlasses.avi": {
    "bocejos": 2,

@@ -221,7 +221,8 @@ def simular(serie, eventos=None, calibracao=None):
             eventos.append((t_b, "bocejo"))
 
     frames = com_rosto = alarmes = avisos = bocejos = piscadas = quedas = 0
-    t_ultimo_aviso = t_bocejo = None
+    t_bocejo = None
+    aviso = core.AvisoLeve(ef.ATTENTION_REPEAT_SECONDS, ef.ATTENTION_REPEAT_IDLE_SECONDS)
     mar_max = 0.0
     prev = {"fechado": False, "bocejos": 0, "piscadas": 0, "cabeca": 0}
     t = t0
@@ -236,12 +237,10 @@ def simular(serie, eventos=None, calibracao=None):
         alarmes += fechado and not prev["fechado"]
         if eventos is not None and fechado and not prev["fechado"]:
             eventos.append((t, "alarme"))
-        # aviso contado como o programa toca: o sinal oscila, mas o som só
-        # repete depois de ATTENTION_REPEAT_SECONDS (ver AlertPlayer)
+        # aviso contado como o programa toca (mesma regra, core.AvisoLeve)
         atencao = st["atencao_by_blinks"] or st["atencao_by_head"] or st["atencao_by_perclos"]
-        if atencao and (t_ultimo_aviso is None or t - t_ultimo_aviso >= ef.ATTENTION_REPEAT_SECONDS):
+        if aviso.tocar(atencao, st["marcador_atencao"], t):
             avisos += 1
-            t_ultimo_aviso = t
             if eventos is not None:
                 eventos.append((t, "aviso"))
         # contagens das janelas deslizantes: soma só os aumentos (evento novo)
