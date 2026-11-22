@@ -13,7 +13,6 @@
     <!-- dispositivos externos -->
     <rect x="4" y="42" width="106" height="70" rx="3"/>
     <rect x="4" y="146" width="106" height="42" rx="3"/>
-    <rect x="4" y="204" width="106" height="42" rx="3"/>
     <rect x="4" y="262" width="106" height="42" rx="3"/>
     <!-- etapas por quadro -->
     <rect x="152" y="42" width="160" height="70" rx="3"/>
@@ -27,6 +26,9 @@
     <rect x="152" y="250" width="160" height="54" rx="3"/>
   </g>
 
+  <!-- buzzer: previsto no software, não instalado no protótipo -->
+  <rect x="4" y="204" width="106" height="42" rx="3" fill="#fff" stroke="#000" stroke-width="1.2" stroke-dasharray="4 3"/>
+
   <g text-anchor="middle">
     <text x="57" y="68" font-weight="bold" font-size="13">Câmera</text>
     <text x="57" y="86">OV5647 NoIR</text>
@@ -34,7 +36,7 @@
     <text x="57" y="164" font-weight="bold" font-size="13">Áudio</text>
     <text x="57" y="180">Bluetooth</text>
     <text x="57" y="222" font-weight="bold" font-size="13">Buzzer</text>
-    <text x="57" y="238">(reserva)</text>
+    <text x="57" y="238">(não instalado)</text>
     <text x="57" y="280" font-weight="bold" font-size="13">Tela</text>
     <text x="57" y="296">SPI</text>
 
@@ -83,7 +85,7 @@
     <path d="M152,181 H126"/>
     <path d="M126,167 V283"/>
     <path d="M126,167 H110" marker-end="url(#seta)"/>
-    <path d="M126,225 H110" marker-end="url(#seta)"/>
+    <path d="M126,225 H110" marker-end="url(#seta)" stroke-dasharray="3 2"/>
     <path d="M126,283 H110" marker-end="url(#seta)"/>
     <!-- calibração: recebe as medidas ao ligar e devolve os limiares -->
     <path d="M680,77 H692 V277 H680" marker-end="url(#seta)"/>
