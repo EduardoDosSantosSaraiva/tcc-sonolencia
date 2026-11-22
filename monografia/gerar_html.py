@@ -18,7 +18,7 @@ import unicodedata
 from pathlib import Path
 
 AQUI = Path(__file__).parent
-DESKTOP = Path.home() / "Desktop"
+DESKTOP = Path.home() / "Desktop" / "TCC"   # pasta do TCC na Área de Trabalho
 
 # nome amigável usado na cópia da Área de Trabalho
 # só a introdução vai pra Área de Trabalho: é o que o orientador pediu
@@ -53,7 +53,8 @@ CSS = """
  table{border-collapse:collapse;width:100%;font-size:10pt;line-height:1.1;margin:0;page-break-inside:avoid}
  th,td{border:1px solid #000;padding:3pt 4pt;text-align:left;vertical-align:top}
  .figura{text-align:center;margin:0}
- .figura svg,.figura img{width:100%;height:auto}
+ .figura svg{width:100%;height:auto}
+ .figura img{width:9cm;max-width:100%;height:auto}  /* foto: 9 cm, não a largura toda */
  @media print{body{margin:0;max-width:none}}
 """
 
@@ -197,7 +198,7 @@ def main():
         destino, copias = converter(alvo)
         print(f"{Path(alvo).name} -> {destino.name}")
         for c in copias:
-            print(f"    Área de Trabalho: {c.name}")
+            print(f"    Área de Trabalho/TCC: {c.name}")
 
 
 if __name__ == "__main__":

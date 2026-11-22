@@ -101,7 +101,9 @@ monografia/             texto do TCC, figuras e apuração dos dados da PRF
   piscada normal, piscada longa, microssono, fala normal, bocejo, queda de cabeça
   e óculos escuros. O `./autoteste.sh` narra cada cenário por voz, avalia
   sozinho se o sinal esperado foi detectado e salva o relatório em
-  `autoteste_resultados/`.
+  `autoteste_resultados/`. A versão final passou nos oito cenários na mesa
+  (20/11) e dentro de um carro parado, no claro e no escuro, este com os
+  LEDs infravermelhos acesos (22/11).
 - **YawDD** (349 vídeos gravados em carro; 90 pessoas no conjunto Mirror e 29
   no Dash): bocejo com
   sensibilidade de 86,1% e precisão de 99,0%; alarmes de sono falsos caíram de

@@ -77,14 +77,26 @@ def salvar(fig, nome):
 # Figura 2: autoteste
 # ---------------------------------------------------------------------------
 
+# rodadas feitas dentro do carro parado (22/11/2026); as demais, com o sistema na mesa
+RODADAS_CARRO = {
+    "20261122_114847": "escuro",
+    "20261122_115215": "claro",
+}
+
+
 def rodadas_autoteste():
-    """[(rótulo 'dd/mm hh:mm', aprovados)] das rodadas completas (8 cenários)."""
+    """[(rótulo, aprovados, no_carro)] das rodadas completas (8 cenários)."""
     rodadas = []
     for arq in sorted((PROJETO / "autoteste_resultados").glob("*.md")):
         m = re.search(r"\*\*(\d+)/(\d+) cenários passaram", arq.read_text())
         d = re.match(r"(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})", arq.stem)
         if m and d and m.group(2) == "8":
-            rodadas.append((f"{d.group(3)}/{d.group(2)}\n{d.group(4)}:{d.group(5)}", int(m.group(1))))
+            if arq.stem in RODADAS_CARRO:
+                # o relógio do Pi ficou sem internet no carro: a hora não vale, vai a condição
+                rotulo = f"{d.group(3)}/{d.group(2)}\n{RODADAS_CARRO[arq.stem]}"
+            else:
+                rotulo = f"{d.group(3)}/{d.group(2)}\n{d.group(4)}:{d.group(5)}"
+            rodadas.append((rotulo, int(m.group(1)), arq.stem in RODADAS_CARRO))
     return rodadas
 
 
@@ -93,18 +105,27 @@ def figura_autoteste():
     if not rodadas:
         print("  (sem relatórios do autoteste)")
         return
-    rotulos, valores = zip(*rodadas)
-    fig, ax = plt.subplots(figsize=(LARGURA_POL, 2.3))
+    rotulos, valores, carro = zip(*rodadas)
+    fig, ax = plt.subplots(figsize=(LARGURA_POL, 2.5))
     x = range(len(valores))
-    ax.bar(x, valores, width=0.45, color=AZUL)
-    ax.set_xticks(list(x), rotulos, fontsize=7.5)
+    cores = [AZUL_ESCURO if c else AZUL_CLARO for c in carro]
+    ax.bar(x, valores, width=0.45, color=cores)
+    ax.set_xticks(list(x), rotulos, fontsize=6.6)
     ax.set_ylim(0, 8.9)
     ax.set_yticks(range(0, 9, 2))
     ax.set_ylabel("Cenários aprovados (de 8)")
     ax.grid(axis="x", visible=False)
-    # rótulo só na última rodada, a que vale como resultado
-    ax.annotate(f"{valores[-1]}/8", (len(valores) - 1, valores[-1]), xytext=(0, 3),
-                textcoords="offset points", ha="center", va="bottom", color=TEXTO, fontsize=9)
+    if any(carro):
+        from matplotlib.patches import Patch
+        ax.legend(handles=[Patch(color=AZUL_CLARO, label="Fora do veículo"),
+                           Patch(color=AZUL_ESCURO, label="Carro parado")],
+                  loc="upper left", bbox_to_anchor=(0, 1.16), ncol=2, fontsize=8)
+    # rótulo nas rodadas da versão final: a última fora do carro e as do carro
+    finais = [i for i, c in enumerate(carro) if c]
+    finais = ([finais[0] - 1] + finais) if finais else [len(valores) - 1]
+    for i in finais:
+        ax.annotate(f"{valores[i]}/8", (i, valores[i]), xytext=(0, 3),
+                    textcoords="offset points", ha="center", va="bottom", color=TEXTO, fontsize=9)
     salvar(fig, "figura2_autoteste.svg")
 
 

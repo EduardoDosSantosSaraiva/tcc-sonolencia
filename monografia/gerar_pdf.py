@@ -29,7 +29,7 @@ import tempfile
 from pathlib import Path
 
 AQUI = Path(__file__).parent
-DESKTOP = Path.home() / "Desktop"
+DESKTOP = Path.home() / "Desktop" / "TCC"   # pasta do TCC na Área de Trabalho
 
 A4 = (595.276, 841.89)
 MARGEM_DIREITA_PT = 56.7          # 2 cm
@@ -71,7 +71,8 @@ CSS = """
  table{border-collapse:collapse;width:100%;font-size:10pt;line-height:1.1;margin:0;page-break-inside:avoid}
  .quadro{page-break-inside:avoid}
  .figura{text-align:center;margin:0}
- .figura svg,.figura img{width:100%;height:auto}
+ .figura svg{width:100%;height:auto}
+ .figura img{width:9cm;max-width:100%;height:auto}  /* foto: 9 cm, não a largura toda */
  th,td{border:1px solid #000;padding:3pt 4pt;text-align:left;vertical-align:top}
  /* títulos sem indicativo numérico vão centralizados (ABNT NBR 14724) */
  .refs h1,.lista h1{text-align:center}
@@ -304,7 +305,7 @@ def main():
         for nome in capitulos:
             miolo, novas = separar_referencias(corpo(AQUI / nome))
             # título, quadro (ou figura) e fonte sempre na mesma página
-            miolo = re.sub(r'(<p class="legenda">(?:Quadro|Figura) .*?(?:</table>|</svg></div>)\s*<p class="legenda">Fonte[^<]*</p>)',
+            miolo = re.sub(r'(<p class="legenda">(?:Quadro|Figura) .*?(?:</table>|</svg></div>|<img[^>]*></div>)\s*<p class="legenda">Fonte[^<]*</p>)',
                            r'<div class="quadro">\1</div>', miolo, flags=re.S)
             for n in sorted(novas.keys() & refs.keys()):
                 if novas[n] != refs[n]:
@@ -340,7 +341,7 @@ def main():
     print(f"PDF gerado: {saida}")
     if DESKTOP.is_dir():
         shutil.copy(saida, DESKTOP / saida.name)
-        print(f"Área de Trabalho: {saida.name}")
+        print(f"Área de Trabalho/TCC: {saida.name}")
 
 
 if __name__ == "__main__":
