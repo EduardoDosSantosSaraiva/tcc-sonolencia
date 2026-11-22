@@ -52,7 +52,7 @@ Decisões de projeto que valem destaque:
 
 ```bash
 sudo apt install -y python3-picamera2 libcamera-apps sox
-git clone <URL-DO-REPOSITORIO> tcc_sonolencia
+git clone https://github.com/EduardoDosSantosSaraiva/tcc-sonolencia.git tcc_sonolencia
 cd tcc_sonolencia
 ./baixar_modelos.sh                       # modelos do MediaPipe e do Piper
 python3 -m venv --system-site-packages venv

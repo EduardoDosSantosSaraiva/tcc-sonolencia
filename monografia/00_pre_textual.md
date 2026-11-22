@@ -65,6 +65,5 @@ Drowsy driving is an underreported cause of road crashes: on Brazilian federal h
 
 ## Observações para revisão (não fazem parte do texto)
 
-- **Orientador x coordenador:** você mencionou o professor Fábio de Oliveira Guimarães como coordenador. No TCC-modelo ele aparece como "Orientador: Fábio de Oliveira", e foi assim que registrei aqui. Se ele for coordenador do curso e o orientador for outra pessoa, é só me dizer que eu corrijo a folha de rosto.
-- **Ordem dos autores:** listei na ordem em que você informou (Antonio Eduardo, depois Lucas). Muitos cursos pedem ordem alfabética — confirme com a coordenação.
+- **Orientador e ordem dos autores, confirmados em 22/11/2026:** o Prof. Fábio de Oliveira Guimarães é o orientador, e a ordem é Antonio Eduardo, depois Lucas.
 - **Título:** o título longo é o sugerido. Alternativa mais enxuta, caso a banca prefira: "Detecção de sonolência do motorista em tempo real com visão computacional embarcada".
