@@ -91,10 +91,14 @@ Dois achados que usamos como argumento:
   Madrugada:   40,5% dos acidentes por sono acontecem entre 0h e 6h, faixa que
                responde por so 12,6% do total. Concentracao de 3,2 vezes.
 
-Contraponto citado no texto: a ABRAMET estima que ~42% dos acidentes em rodovias
-federais estariam ligados a sonolencia. A diferenca entre 3,18% registrado e 42%
-estimado e o proprio argumento: nao existe "bafometro do sono", entao o registro
-oficial e piso, nao medida.
+Contraponto citado no texto (trocado em 22/11/2026): Owens et al. 2018 (AAA
+Foundation, estudo SHRP 2): o PERCLOS no video de 701 colisoes achou sonolencia em
+9,5% delas (10,8% das que iriam para registro policial), contra 1,4% nas
+estatisticas oficiais dos EUA. O argumento continua: nao existe "bafometro do
+sono", entao o registro oficial (inclusive os 3,18% da PRF) e piso, nao medida.
+O antigo "42% da ABRAMET" SAIU: nao aparece no comunicado que era citado (o dos
+280/283,5 mil acidentes ligados a saude do motorista) e so circula em noticias,
+sem estudo original; a pesquisa da ABN com a ABRAMET (2019) fala em 20%.
 
 
 5. REFERENCIAS DA INTRODUCAO (15, todas conferidas uma a uma)
@@ -102,7 +106,7 @@ oficial e piso, nao medida.
  1. OMS. Global status report on road safety 2023.
  2. NARCISO & MELLO. Rev. Saude Publica, v. 51, 2017.
  3. PRF. Dados abertos (datatran) 2020-2025. Apuracao propria.
- 4. ABRAMET. Levantamento sobre saude de motoristas.
+ 4. OWENS et al. Prevalence of drowsy-driving crashes, AAA Foundation, 2018.
  5. DAWSON & REID. Nature, v. 388, 1997. (17-24 h acordado = 0,05-0,10% de
     alcool no sangue)
  6. BRASIL. Lei 13.103/2015 (Lei do Motorista).
